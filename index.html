@@ -10,10 +10,11 @@
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="styles.css" />
 </head>
-<body>
-  <div class="bg-glow" aria-hidden="true"></div>
+<body data-theme="dark">
+<div class="app">
 
-  <header class="site-header">
+  <!-- ============ SIDEBAR ============ -->
+  <aside class="sidebar">
     <div class="brand">
       <span class="brand-mark" aria-hidden="true">⚡</span>
       <div>
@@ -21,61 +22,120 @@
         <p class="tagline">Progress Tracker</p>
       </div>
     </div>
-    <p class="today" id="todayLabel"></p>
-  </header>
 
-  <main>
-    <section class="hero">
-      <div class="hero-text">
-        <h2>Break it down.<br />Build it up.</h2>
-        <p>Big goals become small tasks. Small tasks become progress.</p>
-      </div>
-      <div class="hero-ring">
-        <svg viewBox="0 0 120 120" width="132" height="132" role="img" aria-label="Overall progress">
-          <circle cx="60" cy="60" r="52" class="ring-track" />
-          <circle cx="60" cy="60" r="52" class="ring-fill" id="overallRing" />
-        </svg>
-        <div class="ring-label">
-          <strong id="overallPct">0%</strong>
-          <span>overall</span>
+    <nav class="nav" aria-label="Sections">
+      <button type="button" class="nav-btn active" data-page="dashboard"><span class="nav-icon">📊</span>Dashboard</button>
+      <button type="button" class="nav-btn" data-page="wishlist"><span class="nav-icon">⭐</span>Wishlist</button>
+      <button type="button" class="nav-btn" data-page="notes"><span class="nav-icon">📝</span>Notes</button>
+      <button type="button" class="nav-btn" data-page="profile"><span class="nav-icon">👤</span>Profile</button>
+    </nav>
+
+    <div class="sidebar-bottom">
+      <label class="theme-toggle" title="Toggle light / dark mode">
+        <input type="checkbox" id="themeToggle" />
+        <span class="switch"><span class="knob">🌙</span></span>
+        <span class="theme-label" id="themeLabel">Dark mode</span>
+      </label>
+      <p class="today" id="todayLabel"></p>
+    </div>
+  </aside>
+
+  <!-- ============ MAIN ============ -->
+  <main class="main">
+
+    <!-- DASHBOARD -->
+    <section class="page active" id="page-dashboard">
+      <header class="page-head">
+        <div>
+          <h2>Dashboard</h2>
+          <p class="page-sub">Break it down. Build it up.</p>
         </div>
-      </div>
+      </header>
+
+      <div class="wheels" id="wheelsRow" aria-label="Progress by category"></div>
+
+      <div id="goalsByCategory"></div>
+
+      <article class="card add-goal-card">
+        <h3>＋ New goal</h3>
+        <div class="add-goal-form">
+          <input type="text" id="newGoalTitle" placeholder="Goal name…" maxlength="80" autocomplete="off" />
+          <select id="newGoalCategory" aria-label="Category">
+            <option value="career">💼 Career</option>
+            <option value="health">💪 Health</option>
+            <option value="personal">🌱 Personal</option>
+            <option value="private">🔒 Private</option>
+          </select>
+          <input type="text" id="newGoalTimeline" placeholder="Timeline (e.g. 2 months)" maxlength="30" autocomplete="off" />
+          <button type="button" class="btn-brass" id="addGoalBtn">Add goal</button>
+        </div>
+      </article>
     </section>
 
-    <section class="goals" id="goalsGrid" aria-live="polite"></section>
-
-    <section class="actions">
-      <button class="btn btn-ghost" id="addGoalBtn" type="button">+ New goal</button>
-      <button class="btn btn-ghost btn-danger" id="resetBtn" type="button">Reset demo data</button>
+    <!-- WISHLIST -->
+    <section class="page" id="page-wishlist">
+      <header class="page-head">
+        <div>
+          <h2>Wishlist</h2>
+          <p class="page-sub">Things you want. Check them off when they're yours.</p>
+        </div>
+      </header>
+      <article class="card">
+        <form class="add-row" id="wishlistForm">
+          <input type="text" id="wishlistInput" placeholder="Add something to your wishlist…" maxlength="120" autocomplete="off" />
+          <button type="submit" class="btn-brass">Add</button>
+        </form>
+        <ul class="check-list" id="wishlistList"></ul>
+      </article>
     </section>
 
-    <footer class="site-footer">
-      <p>Your progress is saved in this browser automatically.</p>
-    </footer>
+    <!-- NOTES -->
+    <section class="page" id="page-notes">
+      <header class="page-head">
+        <div>
+          <h2>Notes</h2>
+          <p class="page-sub">Ideas, reminders, anything worth keeping.</p>
+        </div>
+      </header>
+      <article class="card">
+        <div class="note-form">
+          <input type="text" id="noteTitle" placeholder="Note title…" maxlength="80" autocomplete="off" />
+          <textarea id="noteBody" rows="3" placeholder="Write your note…" maxlength="1000"></textarea>
+          <button type="button" class="btn-brass" id="addNoteBtn">Pin note</button>
+        </div>
+      </article>
+      <div class="notes-grid" id="notesGrid"></div>
+    </section>
+
+    <!-- PROFILE -->
+    <section class="page" id="page-profile">
+      <header class="page-head">
+        <div>
+          <h2>Profile</h2>
+          <p class="page-sub">The person breaking all these tasks.</p>
+        </div>
+      </header>
+      <article class="card profile-card">
+        <div class="profile-top">
+          <span class="avatar" aria-hidden="true">R</span>
+          <div>
+            <h3>Rodrigo Cazuza</h3>
+            <p class="profile-role">Multimedia Designer &amp; Front-End Developer</p>
+            <p class="profile-loc">📍 Astoria, Queens — New York City</p>
+          </div>
+        </div>
+        <dl class="profile-links">
+          <div><dt>Portfolio</dt><dd><a href="https://rodrigocazuza.com" target="_blank" rel="noopener">rodrigocazuza.com</a></dd></div>
+          <div><dt>Email</dt><dd><a href="mailto:visualdesigner@rodrigocazuza.com">visualdesigner@rodrigocazuza.com</a></dd></div>
+          <div><dt>GitHub</dt><dd><a href="https://github.com/Rodrigoccazuza" target="_blank" rel="noopener">github.com/Rodrigoccazuza</a></dd></div>
+        </dl>
+        <div class="profile-stats" id="profileStats"></div>
+      </article>
+    </section>
+
   </main>
+</div>
 
-  <template id="goalCardTemplate">
-    <article class="goal-card">
-      <div class="goal-top">
-        <span class="goal-icon"></span>
-        <div class="goal-headings">
-          <h3 class="goal-title"></h3>
-          <span class="goal-timeline"></span>
-        </div>
-        <button class="icon-btn goal-delete" type="button" title="Delete goal" aria-label="Delete goal">✕</button>
-      </div>
-      <div class="progress">
-        <div class="progress-bar"><div class="progress-fill"></div></div>
-        <span class="progress-text"></span>
-      </div>
-      <ul class="task-list"></ul>
-      <form class="add-task">
-        <input type="text" name="taskText" placeholder="Add a task…" maxlength="120" autocomplete="off" />
-        <button type="submit" aria-label="Add task">+</button>
-      </form>
-    </article>
-  </template>
-
-  <script src="app.js"></script>
+<script src="app.js"></script>
 </body>
 </html>

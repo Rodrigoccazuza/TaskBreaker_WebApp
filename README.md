@@ -2,9 +2,11 @@
 
 **Break it down. Build it up.** — a personal progress tracker that turns big goals into small, checkable tasks.
 
+**Live:** https://rodrigoccazuza.github.io/TaskBreaker_WebApp/
+
 ## What it is
 
-A single-page web app (no build step, no backend). Add goals, break them into tasks, check them off, and watch your progress bars fill up. Progress saves automatically in your browser via `localStorage`.
+A single-page web app (no build step, no backend). Add goals, break them into tasks, check them off, and watch your progress fill up. Everything saves automatically in your browser via `localStorage`.
 
 ## Run it
 
@@ -16,14 +18,23 @@ npx serve .
 python3 -m http.server 8000
 ```
 
-## Features (v1)
+## Features (v2)
 
-- Goal cards with emoji icon, timeline badge, and animated progress bar
-- Task checklists: add, check off, and delete tasks
-- Overall progress ring in the hero
-- Add new goals, reset to demo data
+- **Dashboard** — four category gauges (💼 Career, 💪 Health, 🌱 Personal, 🔒 Private)
+  instead of one overall wheel, with goals grouped under each category
+- **Wishlist** — things you want; check them off when they're yours
+- **Notes** — pinned note cards for ideas and reminders
+- **Profile** — about you, plus live stats (goals, tasks done, wishes granted)
+- **Skeuomorphic skin** — brushed metal, brass, carved inputs, and a physical
+  light/dark mode toggle in the sidebar
 - Celebration pulse when a goal hits 100%
-- Dark, responsive design — works on phone and desktop
+- Responsive — sidebar becomes a top bar on phones
+
+## Notes
+
+- Data from v1 (stored under `taskbreaker-v1`) is migrated automatically:
+  job/motion goals become Career, the house goal becomes Personal.
+- No backend. Your data never leaves your browser.
 
 ## Roadmap ideas
 
