@@ -28,7 +28,20 @@ function seedGoals() {
       timeline: "2 months", category: "career",
       tasks: [
         { id: uid(), text: "Polish LinkedIn profile", done: true },
-        { id: uid(), text: "Build Behance portfolio", done: false },
+        {
+          id: uid(), text: "Build Behance portfolio", done: false,
+          subtasks: [
+            { id: uid(), text: "Finish email designs", done: false, subtasks: [] },
+            {
+              id: uid(), text: "Create case study layouts", done: false,
+              subtasks: [
+                { id: uid(), text: "Write project summaries", done: false, subtasks: [] },
+                { id: uid(), text: "Export device mockups", done: false, subtasks: [] },
+              ],
+            },
+            { id: uid(), text: "Publish 3 projects", done: false, subtasks: [] },
+          ],
+        },
         { id: uid(), text: "Post shots on Dribbble", done: false },
         { id: uid(), text: "Add projects to LandBook", done: false },
         { id: uid(), text: "Tweak rodrigocazuza.com", done: false },
@@ -81,9 +94,49 @@ function migrateV1(old) {
       title: g.title || "Untitled goal",
       timeline: g.timeline || "",
       category,
-      tasks: (g.tasks || []).map((x) => ({ id: x.id || uid(), text: x.text || "", done: !!x.done })),
+      tasks: (g.tasks || []).map(normalizeTask),
     };
   });
+}
+
+function normalizeTask(t) {
+  t = t || {};
+  return {
+    id: t.id || uid(),
+    text: t.text || "",
+    done: !!t.done,
+    subtasks: (t.subtasks || []).map(normalizeTask),
+  };
+}
+
+/* A parent task is done when all of its subtasks are done (recursively). */
+function taskDone(t) {
+  if (t.subtasks && t.subtasks.length) return t.subtasks.every(taskDone);
+  return !!t.done;
+}
+
+function setTaskDone(t, val) {
+  if (t.subtasks && t.subtasks.length) t.subtasks.forEach((st) => setTaskDone(st, val));
+  else t.done = val;
+}
+
+function toggleTask(t) {
+  setTaskDone(t, !taskDone(t));
+}
+
+/* leaf-level stats across a task tree */
+function leafStats(tasks) {
+  let total = 0, done = 0;
+  (tasks || []).forEach((t) => {
+    if (t.subtasks && t.subtasks.length) {
+      const s = leafStats(t.subtasks);
+      total += s.total; done += s.done;
+    } else {
+      total++;
+      if (t.done) done++;
+    }
+  });
+  return { total, done };
 }
 
 function load() {
@@ -101,7 +154,8 @@ function load() {
       }
     }
   } catch (e) { /* fall through to seed */ }
-  return { goals: seedGoals(), wishlist: [], notes: [], theme: "dark" };
+  const seeded = seedGoals().map((g) => ({ ...g, tasks: g.tasks.map(normalizeTask) }));
+  return { goals: seeded, wishlist: [], notes: [], theme: "dark" };
 }
 
 function normalize(data) {
@@ -112,7 +166,7 @@ function normalize(data) {
       title: g.title || "Untitled goal",
       timeline: g.timeline || "",
       category: catOf(g.category).id,
-      tasks: (g.tasks || []).map((x) => ({ id: x.id || uid(), text: x.text || "", done: !!x.done })),
+      tasks: (g.tasks || []).map(normalizeTask),
     })),
     wishlist: (data.wishlist || []).map((w) => ({ id: w.id || uid(), text: w.text || "", done: !!w.done })),
     notes: (data.notes || []).map((n) => ({ id: n.id || uid(), title: n.title || "", body: n.body || "" })),
@@ -130,13 +184,13 @@ const state = load();
 
 function goalProgress(goal) {
   if (!goal.tasks.length) return 0;
-  const done = goal.tasks.filter((t) => t.done).length;
+  const done = goal.tasks.filter(taskDone).length;
   return Math.round((done / goal.tasks.length) * 100);
 }
 
 function categoryStats(catId) {
   const tasks = state.goals.filter((g) => g.category === catId).flatMap((g) => g.tasks);
-  const done = tasks.filter((t) => t.done).length;
+  const done = tasks.filter(taskDone).length;
   return { total: tasks.length, done, pct: tasks.length ? Math.round((done / tasks.length) * 100) : 0 };
 }
 
@@ -212,6 +266,99 @@ function renderWheels() {
 
 /* ---------- dashboard : goals ---------- */
 
+/* Recursive task node: a task can hold subtasks, which can hold subtasks… */
+function taskNode(task, removeTask, afterChange) {
+  const li = el("li");
+  const done = taskDone(task);
+  if (done) li.classList.add("done");
+
+  const row = el("div", "task-row");
+  const check = el("input", "task-check");
+  check.type = "checkbox";
+  check.checked = done;
+  check.setAttribute("aria-label", task.text);
+  check.addEventListener("change", () => {
+    toggleTask(task); /* parent toggle flips all descendants */
+    save(); renderAll();
+    if (afterChange) afterChange();
+  });
+
+  const span = el("span", "task-text", task.text);
+
+  const subBtn = el("button", "task-sub-btn", "+");
+  subBtn.type = "button";
+  subBtn.title = "Break into subtasks";
+  subBtn.setAttribute("aria-label", "Add subtask");
+  subBtn.addEventListener("click", () => showSubtaskForm(li, task));
+
+  const x = el("button", "task-del", "✕");
+  x.type = "button";
+  x.setAttribute("aria-label", "Delete task");
+  x.addEventListener("click", () => removeTask(task));
+
+  row.append(check, span, subBtn, x);
+  li.appendChild(row);
+
+  if (task.subtasks && task.subtasks.length) {
+    const kids = task.subtasks;
+    const kd = kids.filter(taskDone).length;
+    const pct = Math.round((kd / kids.length) * 100);
+
+    const miniRow = el("div", "mini-row");
+    const mini = el("div", "mini-progress");
+    const fill = el("div", "mini-fill");
+    fill.style.width = pct + "%";
+    mini.appendChild(fill);
+    miniRow.appendChild(mini);
+    miniRow.appendChild(el("span", "mini-label", kd + "/" + kids.length + " subtasks"));
+    li.appendChild(miniRow);
+
+    const wrap = el("div", "subtask-wrap");
+    const ul = el("ul", "task-list subtasks");
+    kids.forEach((st) => ul.appendChild(taskNode(st, (child) => {
+      task.subtasks = task.subtasks.filter((s) => s.id !== child.id);
+      save(); renderAll();
+    }, afterChange)));
+    wrap.appendChild(ul);
+    li.appendChild(wrap);
+  }
+
+  return li;
+}
+
+function showSubtaskForm(li, task) {
+  let wrap = li.querySelector(":scope > .subtask-wrap");
+  if (!wrap) {
+    wrap = el("div", "subtask-wrap");
+    wrap.appendChild(el("ul", "task-list subtasks"));
+    li.appendChild(wrap);
+  }
+  if (wrap.querySelector(".subtask-form")) {
+    wrap.querySelector(".subtask-form input").focus();
+    return;
+  }
+  const ul = wrap.querySelector("ul");
+  const form = el("form", "add-task subtask-form");
+  const input = el("input");
+  input.type = "text";
+  input.placeholder = "Break it down further…";
+  input.maxLength = 120;
+  input.autocomplete = "off";
+  const add = el("button", "btn-brass", "+");
+  add.type = "submit";
+  add.setAttribute("aria-label", "Add subtask");
+  form.append(input, add);
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const text = input.value.trim();
+    if (!text) return;
+    task.subtasks.push({ id: uid(), text, done: false, subtasks: [] });
+    save(); renderAll();
+  });
+  wrap.insertBefore(form, ul);
+  input.focus();
+}
+
 function goalCard(goal) {
   const card = el("article", "card goal-card");
 
@@ -250,33 +397,17 @@ function goalCard(goal) {
   if (pct === 100 && goal.tasks.length) card.classList.add("complete");
 
   const list = el("ul", "task-list");
-  goal.tasks.forEach((task) => {
-    const li = el("li");
-    if (task.done) li.classList.add("done");
-    const check = el("input", "task-check");
-    check.type = "checkbox";
-    check.checked = task.done;
-    check.setAttribute("aria-label", task.text);
-    check.addEventListener("change", () => {
-      const was = goalProgress(goal) === 100;
-      task.done = !task.done;
-      save(); renderAll();
-      if (!was && goalProgress(goal) === 100 && goal.tasks.length) {
-        const node = document.querySelector('[data-goal="' + goal.id + '"]');
-        if (node) { node.classList.add("celebrate"); setTimeout(() => node.classList.remove("celebrate"), 600); }
-      }
-    });
-    const span = el("span", "task-text", task.text);
-    const x = el("button", "task-del", "✕");
-    x.type = "button";
-    x.setAttribute("aria-label", "Delete task");
-    x.addEventListener("click", () => {
-      goal.tasks = goal.tasks.filter((t) => t.id !== task.id);
-      save(); renderAll();
-    });
-    li.append(check, span, x);
-    list.appendChild(li);
-  });
+  const removeTop = (task) => {
+    goal.tasks = goal.tasks.filter((t) => t.id !== task.id);
+    save(); renderAll();
+  };
+  const celebrate = () => {
+    if (goalProgress(goal) === 100 && goal.tasks.length) {
+      const node = document.querySelector('[data-goal="' + goal.id + '"]');
+      if (node) { node.classList.add("celebrate"); setTimeout(() => node.classList.remove("celebrate"), 600); }
+    }
+  };
+  goal.tasks.forEach((task) => list.appendChild(taskNode(task, removeTop, celebrate)));
   card.appendChild(list);
 
   const form = el("form", "add-task");
@@ -289,7 +420,7 @@ function goalCard(goal) {
     e.preventDefault();
     const text = input.value.trim();
     if (!text) return;
-    goal.tasks.push({ id: uid(), text, done: false });
+    goal.tasks.push({ id: uid(), text, done: false, subtasks: [] });
     save(); renderAll();
   });
   card.appendChild(form);
@@ -415,11 +546,10 @@ document.getElementById("addNoteBtn").addEventListener("click", () => {
 function renderProfile() {
   const stats = document.getElementById("profileStats");
   stats.innerHTML = "";
-  const tasks = state.goals.flatMap((g) => g.tasks);
-  const done = tasks.filter((t) => t.done).length;
+  const leaves = leafStats(state.goals.flatMap((g) => g.tasks));
   [
     [state.goals.length, "goals"],
-    [done + "/" + tasks.length, "tasks done"],
+    [leaves.done + "/" + leaves.total, "tasks done"],
     [state.wishlist.filter((w) => w.done).length + "/" + state.wishlist.length, "wishes granted"],
     [state.notes.length, "notes"],
   ].forEach(([num, label]) => {

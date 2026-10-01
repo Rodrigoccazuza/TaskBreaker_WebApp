@@ -18,8 +18,11 @@ npx serve .
 python3 -m http.server 8000
 ```
 
-## Features (v2)
+## Features (v3)
 
+- **Subtasks** — every task breaks down into subtasks, as deep as you want.
+  Each parent task shows a mini progress bar of its subtasks; tapping a
+  parent's checkbox checks everything under it
 - **Dashboard** — four category gauges (💼 Career, 💪 Health, 🌱 Personal, 🔒 Private)
   instead of one overall wheel, with goals grouped under each category
 - **Wishlist** — things you want; check them off when they're yours
