@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Task Breaker — Progress Tracker</title>
+<meta name="description" content="Task Breaker: break big goals into small tasks and track your progress." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="bg-glow" aria-hidden="true"></div>
+
+  <header class="site-header">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">⚡</span>
+      <div>
+        <h1>Task Breaker</h1>
+        <p class="tagline">Progress Tracker</p>
+      </div>
+    </div>
+    <p class="today" id="todayLabel"></p>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="hero-text">
+        <h2>Break it down.<br />Build it up.</h2>
+        <p>Big goals become small tasks. Small tasks become progress.</p>
+      </div>
+      <div class="hero-ring">
+        <svg viewBox="0 0 120 120" width="132" height="132" role="img" aria-label="Overall progress">
+          <circle cx="60" cy="60" r="52" class="ring-track" />
+          <circle cx="60" cy="60" r="52" class="ring-fill" id="overallRing" />
+        </svg>
+        <div class="ring-label">
+          <strong id="overallPct">0%</strong>
+          <span>overall</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="goals" id="goalsGrid" aria-live="polite"></section>
+
+    <section class="actions">
+      <button class="btn btn-ghost" id="addGoalBtn" type="button">+ New goal</button>
+      <button class="btn btn-ghost btn-danger" id="resetBtn" type="button">Reset demo data</button>
+    </section>
+
+    <footer class="site-footer">
+      <p>Your progress is saved in this browser automatically.</p>
+    </footer>
+  </main>
+
+  <template id="goalCardTemplate">
+    <article class="goal-card">
+      <div class="goal-top">
+        <span class="goal-icon"></span>
+        <div class="goal-headings">
+          <h3 class="goal-title"></h3>
+          <span class="goal-timeline"></span>
+        </div>
+        <button class="icon-btn goal-delete" type="button" title="Delete goal" aria-label="Delete goal">✕</button>
+      </div>
+      <div class="progress">
+        <div class="progress-bar"><div class="progress-fill"></div></div>
+        <span class="progress-text"></span>
+      </div>
+      <ul class="task-list"></ul>
+      <form class="add-task">
+        <input type="text" name="taskText" placeholder="Add a task…" maxlength="120" autocomplete="off" />
+        <button type="submit" aria-label="Add task">+</button>
+      </form>
+    </article>
+  </template>
+
+  <script src="app.js"></script>
+</body>
+</html>
