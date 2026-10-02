@@ -30,6 +30,8 @@
       <button type="button" class="nav-btn" data-page="wishlist"><span class="nav-icon">⭐</span>Wishlist</button>
       <button type="button" class="nav-btn" data-page="notes"><span class="nav-icon">📝</span>Notes</button>
       <button type="button" class="nav-btn" data-page="digest"><span class="nav-icon">✉️</span>Digest</button>
+      <button type="button" class="nav-btn" data-page="connections"><span class="nav-icon">🔗</span>Connections</button>
+      <button type="button" class="nav-btn" data-page="pathfinder"><span class="nav-icon">🧭</span>Pathfinder</button>
       <button type="button" class="nav-btn" data-page="profile"><span class="nav-icon">👤</span>Profile</button>
     </nav>
 
@@ -199,6 +201,72 @@
       </article>
     </section>
 
+    <!-- CONNECTIONS -->
+    <section class="page" id="page-connections">
+      <header class="page-head">
+        <div>
+          <h2>Connections</h2>
+          <p class="page-sub">Bring in tasks and notes from your other tools.</p>
+        </div>
+      </header>
+      <article class="card">
+        <h3>🔗 How importing works</h3>
+        <p class="fine-print" style="margin-bottom:0">Task Breaker runs entirely in your browser with no server, so it can't do live two-way sync with Notion or Google (those need secure logins a static page can't hold). Instead, import your data any of these ways — it stays on your device, and Pathfinder can then organize it into your categories.</p>
+      </article>
+      <article class="card">
+        <h3>📄 Upload a file</h3>
+        <p class="fine-print">CSV or JSON. From Google Sheets: File → Download → CSV. From Notion: ••• → Export → CSV.</p>
+        <div class="add-row">
+          <button type="button" class="btn-primary" id="importFileBtn">Choose file…</button>
+          <input type="file" id="importFile" accept=".csv,.json,.txt" hidden />
+        </div>
+      </article>
+      <article class="card">
+        <h3>📋 Paste text</h3>
+        <p class="fine-print">One item per line. Add a date like <code>2026-10-15</code> or <code>due: Oct 15</code> anywhere in the line.</p>
+        <div class="note-form">
+          <textarea id="pasteImport" rows="4" placeholder="Buy birthday gift&#10;Finish portfolio case study due: 2026-10-20&#10;Call dentist" maxlength="5000"></textarea>
+          <button type="button" class="btn-primary" id="pasteImportBtn">Import pasted text</button>
+        </div>
+      </article>
+      <article class="card">
+        <h3>📊 Published Google Sheet</h3>
+        <p class="fine-print">In Google Sheets: File → Share → Publish to web (CSV), then paste the link here. Or paste any public CSV link.</p>
+        <div class="add-row">
+          <input type="url" id="sheetUrl" placeholder="https://docs.google.com/spreadsheets/… or .csv link" autocomplete="off" />
+          <button type="button" class="btn-primary" id="sheetImportBtn">Fetch</button>
+        </div>
+      </article>
+      <article class="card">
+        <h3>📥 Imported items <span class="count-pill" id="importCount">0</span></h3>
+        <ul class="check-list" id="importList"></ul>
+      </article>
+    </section>
+
+    <!-- PATHFINDER -->
+    <section class="page" id="page-pathfinder">
+      <header class="page-head">
+        <div>
+          <h2>Pathfinder</h2>
+          <p class="page-sub">Your on-device interpreter. It reads your tasks and imports, sorts them into categories, and charts a personalized quest path.</p>
+        </div>
+      </header>
+      <article class="card path-hero">
+        <div>
+          <h3>🧭 Chart my path</h3>
+          <p class="fine-print" style="margin-bottom:0">Analyzes open tasks and imported items, assigns each a category, and builds today's quest path — ordered by urgency and impact. Runs locally; nothing leaves your device.</p>
+        </div>
+        <button type="button" class="btn-primary" id="analyzeBtn">Analyze</button>
+      </article>
+      <div id="pathResults" hidden>
+        <h3 class="section-title">🗺️ Today's quest path</h3>
+        <ol class="path-list" id="pathList"></ol>
+        <h3 class="section-title">💡 Suggestions</h3>
+        <p class="fine-print">Imported items, pre-sorted. One tap sends a quest into the matching category inbox.</p>
+        <div id="suggestList"></div>
+      </div>
+    </section>
+
     <!-- PROFILE -->
     <section class="page" id="page-profile">
       <header class="page-head">
@@ -242,6 +310,18 @@
 </div>
 
 <div class="toast" id="toast" role="status"></div>
+
+<!-- Focus lock-in bar -->
+<div class="focus-bar" id="focusBar" hidden>
+  <span class="focus-pulse" aria-hidden="true">🔒</span>
+  <div class="focus-info">
+    <strong id="focusTaskName">Task</strong>
+    <span class="focus-sub" id="focusGoalName"></span>
+  </div>
+  <span class="focus-time" id="focusTime">25:00</span>
+  <button type="button" class="focus-btn" id="focusPauseBtn" title="Pause / resume">⏸️</button>
+  <button type="button" class="focus-btn" id="focusStopBtn" title="End focus session">⏹️</button>
+</div>
 
 <script src="app.js"></script>
 </body>
