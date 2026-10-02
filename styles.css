@@ -1023,3 +1023,12 @@ input[type="checkbox"]:not(.task-check):checked::after {
   .focus-time { font-size: 18px; }
   .path-step { padding: 12px; }
 }
+
+/* ============ feather line icons ============ */
+.fi { width: 1.15em; height: 1.15em; vertical-align: -0.22em; flex-shrink: 0; }
+button .fi, .nav-icon .fi { pointer-events: none; }
+.brand-mark .fi { width: 30px; height: 30px; }
+.goal-icon .fi { width: 24px; height: 24px; }
+.medal-icon .fi { width: 30px; height: 30px; }
+h3 .fi { color: var(--accent); }
+.task-lock-btn .fi, .task-cal-btn .fi, .task-del .fi, .task-sub-btn .fi { width: 14px; height: 14px; }
