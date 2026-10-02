@@ -7,24 +7,24 @@ const STORAGE_KEY = "taskbreaker-v4";
 const PREV_KEY = "taskbreaker-v2";
 
 const CATEGORIES = [
-  { id: "career", icon: "💼", name: "Career" },
-  { id: "health", icon: "💪", name: "Health" },
-  { id: "personal", icon: "🌱", name: "Personal" },
-  { id: "private", icon: "🔒", name: "Private" },
+  { id: "career", icon: "briefcase", name: "Career" },
+  { id: "health", icon: "activity", name: "Health" },
+  { id: "personal", icon: "smile", name: "Personal" },
+  { id: "private", icon: "lock", name: "Private" },
 ];
 
 const DAY_NAMES = ["S", "M", "T", "W", "T", "F", "S"];
 const DAY_FULL = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 const MEDALS = [
-  { id: "first-step", icon: "🌱", name: "First Step", desc: "Complete your first task" },
-  { id: "spark", icon: "✨", name: "Spark", desc: "Reach a 3-day streak" },
-  { id: "goal-crusher", icon: "🥈", name: "Goal Crusher", desc: "Complete a full goal" },
-  { id: "on-fire", icon: "🔥", name: "On Fire", desc: "Reach a 7-day streak" },
-  { id: "balanced", icon: "⚖️", name: "Balanced", desc: "Get every category above 50%" },
-  { id: "routine-keeper", icon: "📅", name: "Routine Keeper", desc: "Finish all routines in a week" },
-  { id: "century", icon: "🥇", name: "Century", desc: "Complete 100 tasks" },
-  { id: "deep-focus", icon: "🧘", name: "Deep Focus", desc: "Finish 3 lock-in focus sessions" },
+  { id: "first-step", icon: "flag", name: "First Step", desc: "Complete your first task" },
+  { id: "spark", icon: "star", name: "Spark", desc: "Reach a 3-day streak" },
+  { id: "goal-crusher", icon: "check-circle", name: "Goal Crusher", desc: "Complete a full goal" },
+  { id: "on-fire", icon: "trending-up", name: "On Fire", desc: "Reach a 7-day streak" },
+  { id: "balanced", icon: "sliders", name: "Balanced", desc: "Get every category above 50%" },
+  { id: "routine-keeper", icon: "calendar", name: "Routine Keeper", desc: "Finish all routines in a week" },
+  { id: "century", icon: "award", name: "Century", desc: "Complete 100 tasks" },
+  { id: "deep-focus", icon: "crosshair", name: "Deep Focus", desc: "Finish 3 lock-in focus sessions" },
 ];
 
 /* ================= utils ================= */
@@ -42,6 +42,20 @@ function el(tag, cls, text) {
   if (cls) n.className = cls;
   if (text !== undefined) n.textContent = text;
   return n;
+}
+
+/* feather icons (bundled locally): <svg> line icons, currentColor stroke */
+function icon(name, size) {
+  try {
+    const lib = window.feather && window.feather.icons;
+    const ic = lib && lib[name];
+    if (ic) return ic.toSvg({ width: size || 24, height: size || 24, class: "fi" });
+  } catch (e) {}
+  return "";
+}
+function setIcon(node, name, size) {
+  node.innerHTML = icon(name, size || 18);
+  return node;
 }
 
 function dayKey(d) {
@@ -75,7 +89,7 @@ function toDayInput(d) {
 function seedGoals() {
   return [
     {
-      id: uid(), icon: "🎯", title: "Land a full-time design job",
+      id: uid(), icon: "target", title: "Land a full-time design job",
       timeline: "2 months", category: "career", deadline: null,
       tasks: [
         { id: uid(), text: "Polish LinkedIn profile", done: true, deadline: null, subtasks: [] },
@@ -102,7 +116,7 @@ function seedGoals() {
       ],
     },
     {
-      id: uid(), icon: "✨", title: "Learn motion design",
+      id: uid(), icon: "film", title: "Learn motion design",
       timeline: "2 months", category: "career", deadline: null,
       tasks: [
         { id: uid(), text: "Pick a course and enroll", done: false, deadline: null, subtasks: [] },
@@ -112,7 +126,7 @@ function seedGoals() {
       ],
     },
     {
-      id: uid(), icon: "🏠", title: "Save money / Buy a house",
+      id: uid(), icon: "home", title: "Save money / Buy a house",
       timeline: "Ongoing", category: "personal", deadline: null,
       tasks: [
         { id: uid(), text: "Set a monthly savings target", done: false, deadline: null, subtasks: [] },
@@ -122,7 +136,7 @@ function seedGoals() {
       ],
     },
     {
-      id: uid(), icon: "🏃", title: "Move every day",
+      id: uid(), icon: "heart", title: "Move every day",
       timeline: "Ongoing", category: "health", deadline: null,
       tasks: [
         { id: uid(), text: "Work out 3x this week", done: false, deadline: null, subtasks: [] },
@@ -148,7 +162,7 @@ function normalizeGoal(g) {
   g = g || {};
   return {
     id: g.id || uid(),
-    icon: g.icon || "🎯",
+    icon: g.icon || "target",
     title: g.title || "Untitled goal",
     timeline: g.timeline || "",
     deadline: g.deadline || null,
@@ -381,7 +395,7 @@ function checkMedals() {
   });
 
   newOnes.forEach((m) => {
-    toast("🏅 Medal earned: " + m.name + " (+25 XP)");
+    toast("Medal earned: " + m.name + " (+25 XP)");
   });
   return newOnes;
 }
@@ -443,7 +457,7 @@ function applyTheme() {
   document.body.dataset.theme = state.theme;
   const toggle = document.getElementById("themeToggle");
   toggle.checked = state.theme === "dark";
-  document.querySelector(".theme-toggle .knob").textContent = state.theme === "dark" ? "🌙" : "☀️";
+  setIcon(document.querySelector(".theme-toggle .knob"), state.theme === "dark" ? "moon" : "sun", 16);
   document.getElementById("themeLabel").textContent = state.theme === "dark" ? "Dark mode" : "Light mode";
 }
 
@@ -489,7 +503,9 @@ function renderWheels() {
     face.appendChild(center);
     dial.appendChild(face);
     gauge.appendChild(dial);
-    gauge.appendChild(el("p", "g-label", cat.icon + " " + cat.name));
+    const gl = el("p", "g-label");
+  gl.innerHTML = icon(cat.icon, 14) + " " + cat.name;
+  gauge.appendChild(gl);
     gauge.appendChild(el("p", "g-sub", s.done + "/" + s.total + " tasks"));
     row.appendChild(gauge);
   });
@@ -506,7 +522,9 @@ function renderAlerts() {
   if (!items.length) return;
 
   const card = el("div", "alert-card");
-  card.appendChild(el("h4", null, "⏰ " + items.length + " urgent deadline" + (items.length > 1 ? "s" : "")));
+  const ah = el("h4");
+  ah.innerHTML = icon("bell", 15) + " " + items.length + " urgent deadline" + (items.length > 1 ? "s" : "");
+  card.appendChild(ah);
   const ul = el("ul");
   items.slice(0, 5).forEach((d) => {
     const li = el("li", null, (d.goal ? d.goal + " — " : "") + d.text + " (" + d.info.text + ")");
@@ -618,7 +636,7 @@ function taskNode(task, removeTask, afterChange, goalTitle) {
     row.appendChild(el("span", "lock-time", fmtClock(state.focus.remainingSec)));
   }
 
-  const calBtn = el("button", "task-cal-btn", "📅");
+  const calBtn = setIcon(el("button", "task-cal-btn"), "calendar", 14);
   calBtn.type = "button";
   calBtn.title = "Deadline & calendar";
   calBtn.classList.add("tool");
@@ -631,13 +649,13 @@ function taskNode(task, removeTask, afterChange, goalTitle) {
   subBtn.setAttribute("aria-label", "Add subtask");
   subBtn.addEventListener("click", () => showSubtaskForm(li, task));
 
-  const lockBtn = el("button", "task-lock-btn", "⏱️");
+  const lockBtn = setIcon(el("button", "task-lock-btn"), "clock", 14);
   lockBtn.type = "button";
   lockBtn.title = "Lock in — focus timer";
   lockBtn.setAttribute("aria-label", "Lock in with a focus timer");
   lockBtn.addEventListener("click", () => toggleTimerPop(li, task, goalTitle));
 
-  const x = el("button", "task-del", "✕");
+  const x = setIcon(el("button", "task-del"), "x", 13);
   x.type = "button";
   x.setAttribute("aria-label", "Delete task");
   x.addEventListener("click", () => removeTask(task));
@@ -711,23 +729,35 @@ function goalCard(goal) {
   card.dataset.goal = goal.id;
 
   const top = el("div", "goal-top");
-  top.appendChild(el("span", "goal-icon", goal.icon));
+  const gic = el("span", "goal-icon");
+  setIcon(gic, goal.icon, 22);
+  top.appendChild(gic);
   const headings = el("div", "goal-headings");
   headings.appendChild(el("h3", "goal-title", goal.title));
   const badges = el("div", "badge-row");
   const cat = catOf(goal.category);
-  badges.appendChild(el("span", "badge cat", cat.icon + " " + cat.name));
-  if (goal.timeline) badges.appendChild(el("span", "badge", "⏳ " + goal.timeline));
+  const cb = el("span", "badge cat");
+  cb.innerHTML = icon(cat.icon, 12) + " " + cat.name;
+  badges.appendChild(cb);
+  if (goal.timeline) {
+    const tb = el("span", "badge");
+    tb.innerHTML = icon("clock", 12) + " " + goal.timeline;
+    badges.appendChild(tb);
+  }
   const ginfo = deadlineInfo(goal.deadline);
-  if (ginfo) badges.appendChild(el("span", "badge " + ginfo.cls, "📅 " + ginfo.text));
+  if (ginfo) {
+    const db = el("span", "badge " + ginfo.cls);
+    db.innerHTML = icon("calendar", 12) + " " + ginfo.text;
+    badges.appendChild(db);
+  }
   headings.appendChild(badges);
   top.appendChild(headings);
 
-  const calBtn = el("button", "icon-btn tool", "📅");
+  const calBtn = setIcon(el("button", "icon-btn tool"), "calendar", 15);
   calBtn.title = "Goal deadline & calendar";
   calBtn.setAttribute("aria-label", "Set goal deadline");
   calBtn.addEventListener("click", () => deadlineEditor(card, goal, goal.title));
-  const del = el("button", "icon-btn", "✕");
+  const del = setIcon(el("button", "icon-btn"), "x", 14);
   del.title = "Delete goal";
   del.setAttribute("aria-label", "Delete goal");
   del.addEventListener("click", () => {
@@ -762,7 +792,7 @@ function goalCard(goal) {
       awardXP(50);
       const node = document.querySelector('[data-goal="' + goal.id + '"]');
       if (node) { node.classList.add("celebrate"); setTimeout(() => node.classList.remove("celebrate"), 600); }
-      toast("🎉 Goal complete: " + goal.title + " (+50 XP)");
+      toast("Goal complete: " + goal.title + " (+50 XP)");
       speak("Goal complete. " + goal.title + ". Amazing work.");
       renderAll();
     }
@@ -773,7 +803,7 @@ function goalCard(goal) {
   const form = el("form", "add-task");
   const input = el("input");
   input.type = "text"; input.placeholder = "Add a task…"; input.maxLength = 120; input.autocomplete = "off";
-  const mic = el("button", "mic-btn", "🎤");
+  const mic = setIcon(el("button", "mic-btn"), "mic", 16);
   mic.type = "button"; mic.title = "Dictate task"; mic.style.width = "46px"; mic.style.fontSize = "18px";
   attachMic(mic, input);
   const add = el("button", "btn-primary", "+");
@@ -818,7 +848,7 @@ document.getElementById("addGoalBtn").addEventListener("click", () => {
   if (!title) { document.getElementById("newGoalTitle").focus(); return; }
   state.goals.push({
     id: uid(),
-    icon: "🎯",
+    icon: "target",
     title,
     timeline: document.getElementById("newGoalTimeline").value.trim(),
     deadline: document.getElementById("newGoalDeadline").value || null,
@@ -854,7 +884,7 @@ function renderRoutines() {
     const card = el("article", "card routine-card");
     const top = el("div", "routine-top" + (allDone ? " done" : ""));
     top.appendChild(el("h4", null, r.text));
-    const x = el("button", "icon-btn", "✕");
+    const x = setIcon(el("button", "icon-btn"), "x", 14);
     x.title = "Delete routine";
     x.setAttribute("aria-label", "Delete routine");
     x.addEventListener("click", () => {
@@ -925,14 +955,16 @@ function renderRewards() {
   document.getElementById("levelTitle").textContent = "Level " + li.level;
   document.getElementById("xpFill").style.width = li.pct + "%";
   document.getElementById("xpText").textContent = state.xp + " XP total · " + li.into + "/300 to next level";
-  document.getElementById("streakPill").textContent = "🔥 " + state.streak + "-day streak";
+  document.getElementById("streakPill").innerHTML = icon("zap", 14) + " " + state.streak + "-day streak";
 
   const grid = document.getElementById("medalsGrid");
   grid.innerHTML = "";
   MEDALS.forEach((m) => {
     const earned = medalEarned(m.id);
     const card = el("div", "medal" + (earned ? " earned" : ""));
-    card.appendChild(el("div", "medal-icon", m.icon));
+    const mi = el("div", "medal-icon");
+  setIcon(mi, m.icon, 26);
+  card.appendChild(mi);
     card.appendChild(el("h4", null, m.name));
     card.appendChild(el("p", null, (earned ? "Earned! " : "Locked — ") + m.desc));
     grid.appendChild(card);
@@ -962,7 +994,7 @@ function renderWishlist() {
       renderWishlist(); renderProfile(); renderRewards();
     });
     li.append(check, el("span", null, item.text));
-    const x = el("button", "task-del", "✕");
+    const x = setIcon(el("button", "task-del"), "x", 13);
     x.setAttribute("aria-label", "Delete wish");
     x.addEventListener("click", () => {
       state.wishlist = state.wishlist.filter((w) => w.id !== item.id);
@@ -996,7 +1028,7 @@ function renderNotes() {
     const card = el("article", "note-card");
     card.appendChild(el("h4", null, note.title || "Untitled"));
     if (note.body) card.appendChild(el("p", null, note.body));
-    const x = el("button", "task-del", "✕");
+    const x = setIcon(el("button", "task-del"), "x", 13);
     x.setAttribute("aria-label", "Delete note");
     x.addEventListener("click", () => {
       state.notes = state.notes.filter((n) => n.id !== note.id);
@@ -1046,7 +1078,7 @@ document.getElementById("saveDigestBtn").addEventListener("click", () => {
 function buildDigest() {
   const d = state.digest;
   const lines = [];
-  lines.push("⚡ Task Breaker — Weekly Digest");
+  lines.push("Task Breaker — Weekly Digest");
   lines.push(new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" }));
   lines.push("");
 
@@ -1074,11 +1106,11 @@ function buildDigest() {
     const open = state.wishlist.filter((w) => !w.done);
     lines.push("WISHLIST (" + open.length + " open)");
     open.slice(0, 8).forEach((w) => lines.push("• " + w.text));
-    if (!open.length) lines.push("• All granted! 🎉");
+    if (!open.length) lines.push("• All granted!");
     lines.push("");
   }
-  lines.push(`Level ${levelInfo().level} · ${state.xp} XP · 🔥 ${state.streak}-day streak`);
-  lines.push("Keep breaking it down. 💪");
+  lines.push(`Level ${levelInfo().level} · ${state.xp} XP · ${state.streak}-day streak`);
+  lines.push("Keep breaking it down.");
   return lines.join("\n");
 }
 
@@ -1187,7 +1219,7 @@ attachMic(document.getElementById("noteMic"), document.getElementById("noteBody"
 (function () {
   const form = document.getElementById("wishlistForm");
   const input = document.getElementById("wishlistInput");
-  const mic = el("button", "mic-btn", "🎤");
+  const mic = setIcon(el("button", "mic-btn"), "mic", 16);
   mic.type = "button";
   mic.title = "Dictate wish";
   mic.style.width = "52px";
@@ -1197,6 +1229,7 @@ attachMic(document.getElementById("noteMic"), document.getElementById("noteBody"
 
 applyTheme();
 loadDigestForm();
+try { if (window.feather) window.feather.replace(); } catch (e) {}
 state.streak = computeStreak();
 checkMedals();
 save();
@@ -1266,7 +1299,7 @@ function startFocus(taskId, taskText, goalTitle, minutes) {
   clearInterval(focusTimerId);
   focusTimerId = setInterval(tickFocus, 1000);
   renderAll();
-  toast("🔒 Locked in for " + minutes + "m: " + taskText);
+  toast("Locked in for " + minutes + "m: " + taskText);
 }
 
 function tickFocus() {
@@ -1310,10 +1343,10 @@ function completeFocus() {
   renderAll();
   chime();
   speak("Time is up. Great focus session.");
-  toast("⏱️ Time's up: " + (f ? f.taskText : "task") + " (+15 XP)");
+  toast("Time's up: " + (f ? f.taskText : "task") + " (+15 XP)");
   try {
     if ("Notification" in window && Notification.permission === "granted") {
-      new Notification("⏱️ Timer up — " + (f ? f.taskText : "task"), {
+      new Notification("Timer up — " + (f ? f.taskText : "task"), {
         body: "Your lock-in session is complete. +15 XP earned.",
       });
     }
@@ -1467,7 +1500,7 @@ function renderImports() {
   document.getElementById("importCount").textContent = items.length;
   if (!items.length) {
     list.appendChild(el("li", "fine-print",
-      state.imports.length ? "All imported items have been organized. 🎉" : "Nothing imported yet — bring in a file, some pasted text, or a sheet link above."));
+      state.imports.length ? "All imported items have been organized." : "Nothing imported yet — bring in a file, some pasted text, or a sheet link above."));
     return;
   }
   items.slice().reverse().forEach((it) => {
@@ -1481,7 +1514,7 @@ function renderImports() {
       const info = deadlineInfo(it.date);
       li.appendChild(el("span", "import-date", info ? info.text : it.date));
     }
-    const x = el("button", "task-del", "✕");
+    const x = setIcon(el("button", "task-del"), "x", 13);
     x.type = "button"; x.setAttribute("aria-label", "Remove import");
     x.addEventListener("click", () => {
       state.imports = state.imports.filter((i) => i.id !== it.id);
@@ -1591,10 +1624,10 @@ function pathCandidates() {
 }
 
 function ensureInboxGoal(catId) {
-  const title = "📥 " + catOf(catId).name + " inbox";
+  const title = catOf(catId).name + " inbox";
   let g = state.goals.find((g) => g.title === title);
   if (!g) {
-    g = normalizeGoal({ icon: "📥", title, timeline: "", category: catId, tasks: [] });
+    g = normalizeGoal({ icon: "inbox", title, timeline: "", category: catId, tasks: [] });
     state.goals.push(g);
   }
   return g;
@@ -1612,20 +1645,30 @@ function analyzePath() {
   const list = document.getElementById("pathList");
   list.innerHTML = "";
   const top = cands.slice(0, 8);
-  if (!top.length) list.appendChild(el("li", "fine-print", "Nothing open — enjoy the calm. ✨"));
+  if (!top.length) list.appendChild(el("li", "fine-print", "Nothing open — enjoy the calm."));
   top.forEach((c) => {
     const li = el("li", "path-step" + (c.urgency <= 1 ? " urgent" : ""));
     const body = el("div", "path-body");
     body.appendChild(el("strong", null, c.title));
     const meta = el("div", "path-meta");
     const cat = catOf(c.category || "personal");
-    meta.appendChild(el("span", "cat-chip", cat.icon + " " + cat.name));
-    if (c.date) { const info = deadlineInfo(c.date); if (info) meta.appendChild(el("span", null, "📅 " + info.text)); }
-    meta.appendChild(el("span", null, c.kind === "import" ? "📥 imported" : "🎯 " + c.goal));
+    const cc = el("span", "cat-chip");
+    cc.innerHTML = icon(cat.icon, 12) + " " + cat.name;
+    meta.appendChild(cc);
+    if (c.date) {
+      const info = deadlineInfo(c.date);
+      if (info) {
+        const pd = el("span");
+        pd.innerHTML = icon("calendar", 12) + " " + info.text;
+        meta.appendChild(pd);
+      }
+    }
+    meta.appendChild(el("span", null, c.kind === "import" ? "imported" : c.goal));
     meta.appendChild(el("span", "xp-chip", "+" + c.xp + " XP"));
     body.appendChild(meta);
     const acts = el("div", "path-actions");
-    const lock = el("button", "path-lock", "🔒 Lock in");
+    const lock = el("button", "path-lock");
+    lock.innerHTML = icon("lock", 13) + " Lock in";
     lock.type = "button";
     lock.addEventListener("click", async () => {
       await ensureNotifyPerm();
@@ -1648,9 +1691,12 @@ function analyzePath() {
     const card = el("div", "suggest-card");
     card.appendChild(el("span", "src-badge", "import"));
     card.appendChild(el("span", "task-text", c.title));
-    card.appendChild(el("span", "cat-chip", cat.icon + " " + cat.name));
+    const sc = el("span", "cat-chip");
+    sc.innerHTML = icon(cat.icon, 12) + " " + cat.name;
+    card.appendChild(sc);
     if (!c.category) card.appendChild(el("span", "conf-tag", "best guess"));
-    const add = el("button", "suggest-add", "＋ Add as quest");
+    const add = el("button", "suggest-add");
+    add.innerHTML = icon("plus", 13) + " Add as quest";
     add.type = "button";
     add.addEventListener("click", () => {
       const item = state.imports.find((i) => i.id === c.ref.id);
@@ -1659,7 +1705,7 @@ function analyzePath() {
       g.tasks.push(normalizeTask({ text: item.title, deadline: item.date }));
       item.added = true;
       save(); renderAll();
-      toast("Quest added to " + cat.name + " inbox 🎯");
+      toast("Quest added to " + cat.name + " inbox");
       analyzePath();
     });
     card.appendChild(add);
