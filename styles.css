@@ -962,3 +962,64 @@ input[type="checkbox"]:not(.task-check):checked::after {
   .main { padding: 22px 16px 50px; }
   .digest-row { grid-template-columns: 1fr; }
 }
+
+/* ============ TASK BREAKER v5 — focus timer, connections, pathfinder ============ */
+
+/* --- lock-in button on task rows --- */
+.task-lock-btn { opacity: .5; background: var(--bg); border: none; color: var(--muted); cursor: pointer; font-size: 13px; width: 28px; height: 28px; border-radius: 9px; box-shadow: var(--small-shadow); flex-shrink: 0; }
+.task-list li:hover .task-lock-btn { opacity: 1; }
+.task-lock-btn:hover { color: var(--accent); }
+.task-list li.locked { box-shadow: 0 0 0 2px var(--accent); border-radius: 12px; }
+.task-list li.locked .task-text { font-weight: 700; }
+.lock-time { font-size: 11px; font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; }
+
+/* --- timer picker popover --- */
+.timer-pop { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; padding: 10px; border-radius: 12px; background: var(--bg); box-shadow: var(--small-inset); }
+.timer-chip { border: none; cursor: pointer; font-family: "Inter", sans-serif; font-size: 13px; font-weight: 600; color: var(--text); background: var(--bg); border-radius: 10px; padding: 8px 14px; box-shadow: var(--small-shadow); }
+.timer-chip:hover { color: var(--accent); }
+.timer-custom { display: flex; gap: 6px; align-items: center; }
+.timer-custom input { width: 64px; border: none; border-radius: 10px; padding: 8px 10px; font-size: 13px; background: var(--bg); color: var(--text); box-shadow: var(--small-inset); }
+
+/* --- floating focus bar --- */
+.focus-bar { position: fixed; left: 50%; transform: translateX(-50%); bottom: 22px; z-index: 60; display: flex; align-items: center; gap: 14px; padding: 12px 18px; border-radius: 20px; background: var(--bg); box-shadow: var(--card-shadow); max-width: min(560px, calc(100vw - 32px)); }
+.focus-pulse { font-size: 22px; animation: focusPulse 1.6s ease-in-out infinite; }
+@keyframes focusPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.18); } }
+.focus-info { display: flex; flex-direction: column; min-width: 0; }
+.focus-info strong { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 280px; }
+.focus-sub { font-size: 11px; color: var(--muted); }
+.focus-time { font-size: 22px; font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; letter-spacing: .02em; }
+.focus-btn { border: none; cursor: pointer; font-size: 18px; width: 40px; height: 40px; border-radius: 12px; background: var(--bg); box-shadow: var(--small-shadow); }
+.focus-btn:active { box-shadow: var(--small-inset); }
+
+/* --- connections --- */
+.count-pill { display: inline-block; font-size: 12px; font-weight: 700; background: var(--bg); box-shadow: var(--small-inset); border-radius: 999px; padding: 2px 12px; margin-left: 8px; color: var(--muted); }
+.src-badge { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--accent); background: var(--bg); box-shadow: var(--small-inset); border-radius: 8px; padding: 3px 8px; margin-right: 8px; flex-shrink: 0; }
+.import-row { display: flex; align-items: center; gap: 8px; }
+.import-row .task-text { flex: 1; }
+.import-date { font-size: 11px; color: var(--muted); flex-shrink: 0; }
+
+/* --- pathfinder --- */
+.path-hero { display: flex; align-items: center; justify-content: space-between; gap: 18px; flex-wrap: wrap; }
+.path-list { list-style: none; display: grid; gap: 12px; padding: 0; margin: 0 0 8px; counter-reset: quest; }
+.path-step { position: relative; display: flex; gap: 14px; align-items: flex-start; background: var(--bg); border-radius: 18px; padding: 16px 18px 16px 14px; box-shadow: var(--card-shadow); }
+.path-step::before { counter-increment: quest; content: counter(quest); flex-shrink: 0; width: 34px; height: 34px; display: grid; place-items: center; border-radius: 50%; background: var(--bg); box-shadow: var(--small-inset); font-weight: 700; color: var(--accent); font-size: 15px; }
+.path-step.urgent::before { color: var(--danger); }
+.path-body { flex: 1; min-width: 0; }
+.path-body strong { display: block; font-size: 14px; margin-bottom: 4px; }
+.path-meta { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 11px; color: var(--muted); }
+.cat-chip { font-size: 11px; font-weight: 700; border-radius: 999px; padding: 3px 10px; background: var(--bg); box-shadow: var(--small-shadow); }
+.xp-chip { font-size: 11px; font-weight: 700; color: var(--gold-deep); }
+.path-actions { display: flex; gap: 8px; flex-shrink: 0; }
+.path-lock { border: none; cursor: pointer; font-size: 12px; font-weight: 700; font-family: "Inter", sans-serif; color: #fff; background: linear-gradient(145deg, var(--accent), var(--accent-deep)); border-radius: 10px; padding: 8px 14px; }
+.suggest-card { display: flex; gap: 12px; align-items: center; background: var(--bg); border-radius: 16px; padding: 14px 16px; box-shadow: var(--small-shadow); margin-bottom: 10px; flex-wrap: wrap; }
+.suggest-card .task-text { flex: 1; min-width: 180px; font-size: 14px; }
+.suggest-add { border: none; cursor: pointer; font-family: "Inter", sans-serif; font-size: 12px; font-weight: 700; color: var(--accent-deep); background: var(--bg); border-radius: 10px; padding: 8px 14px; box-shadow: var(--small-shadow); }
+.suggest-add:active { box-shadow: var(--small-inset); }
+.conf-tag { font-size: 11px; color: var(--muted); }
+
+@media (max-width: 640px) {
+  .focus-bar { gap: 10px; padding: 10px 14px; bottom: 14px; }
+  .focus-info strong { max-width: 150px; }
+  .focus-time { font-size: 18px; }
+  .path-step { padding: 12px; }
+}
