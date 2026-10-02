@@ -24,6 +24,7 @@ const MEDALS = [
   { id: "balanced", icon: "⚖️", name: "Balanced", desc: "Get every category above 50%" },
   { id: "routine-keeper", icon: "📅", name: "Routine Keeper", desc: "Finish all routines in a week" },
   { id: "century", icon: "🥇", name: "Century", desc: "Complete 100 tasks" },
+  { id: "deep-focus", icon: "🧘", name: "Deep Focus", desc: "Finish 3 lock-in focus sessions" },
 ];
 
 /* ================= utils ================= */
@@ -186,6 +187,9 @@ function blankState() {
     digest: defaultDigest(),
     voice: { celebrations: true },
     notify: { deadlines: false },
+    focus: null,
+    imports: [],
+    focusSessions: 0,
   };
 }
 
@@ -204,6 +208,9 @@ function normalize(data) {
     digest: { ...b.digest, ...(data.digest || {}) },
     voice: { celebrations: !(data.voice && data.voice.celebrations === false) },
     notify: { deadlines: !!(data.notify && data.notify.deadlines) },
+    focus: normalizeFocus(data.focus),
+    imports: (data.imports || []).map(normalizeImport),
+    focusSessions: +data.focusSessions || 0,
   };
 }
 
@@ -362,6 +369,7 @@ function checkMedals() {
       return r.days.every((d) => done[d]);
     }),
     "century": leaves.done >= 100,
+    "deep-focus": state.focusSessions >= 3,
   };
 
   MEDALS.forEach((m) => {
@@ -605,6 +613,11 @@ function taskNode(task, removeTask, afterChange, goalTitle) {
     row.append(check, span);
   }
 
+  if (state.focus && state.focus.taskId === task.id) {
+    li.classList.add("locked");
+    row.appendChild(el("span", "lock-time", fmtClock(state.focus.remainingSec)));
+  }
+
   const calBtn = el("button", "task-cal-btn", "📅");
   calBtn.type = "button";
   calBtn.title = "Deadline & calendar";
@@ -618,12 +631,18 @@ function taskNode(task, removeTask, afterChange, goalTitle) {
   subBtn.setAttribute("aria-label", "Add subtask");
   subBtn.addEventListener("click", () => showSubtaskForm(li, task));
 
+  const lockBtn = el("button", "task-lock-btn", "⏱️");
+  lockBtn.type = "button";
+  lockBtn.title = "Lock in — focus timer";
+  lockBtn.setAttribute("aria-label", "Lock in with a focus timer");
+  lockBtn.addEventListener("click", () => toggleTimerPop(li, task, goalTitle));
+
   const x = el("button", "task-del", "✕");
   x.type = "button";
   x.setAttribute("aria-label", "Delete task");
   x.addEventListener("click", () => removeTask(task));
 
-  row.append(calBtn, subBtn, x);
+  row.append(calBtn, lockBtn, subBtn, x);
   li.appendChild(row);
 
   if (task.subtasks && task.subtasks.length) {
@@ -643,6 +662,7 @@ function taskNode(task, removeTask, afterChange, goalTitle) {
     const wrap = el("div", "subtask-wrap");
     const ul = el("ul", "task-list subtasks");
     kids.forEach((st) => ul.appendChild(taskNode(st, (child) => {
+      maybeCancelFocus(child.id);
       task.subtasks = task.subtasks.filter((s) => s.id !== child.id);
       save(); renderAll();
     }, afterChange, goalTitle)));
@@ -733,6 +753,7 @@ function goalCard(goal) {
 
   const list = el("ul", "task-list");
   const removeTop = (task) => {
+    maybeCancelFocus(task.id);
     goal.tasks = goal.tasks.filter((t) => t.id !== task.id);
     save(); renderAll();
   };
@@ -1156,6 +1177,8 @@ function renderAll() {
   renderNotes();
   renderDigestPreview();
   renderProfile();
+  renderImports();
+  renderFocusBar();
 }
 
 attachMic(document.getElementById("noteMic"), document.getElementById("noteBody"));
@@ -1179,3 +1202,490 @@ checkMedals();
 save();
 renderAll();
 fireDeadlineAlerts();
+
+/* ================= v5: normalize helpers for new state ================= */
+
+function normalizeFocus(f) {
+  if (!f || typeof f !== "object") return null;
+  return {
+    taskId: f.taskId || null,
+    taskText: String(f.taskText || ""),
+    goal: String(f.goal || ""),
+    totalSec: +f.totalSec || 0,
+    remainingSec: +f.remainingSec || 0,
+    running: !!f.running,
+    endsAt: +f.endsAt || 0,
+  };
+}
+
+function normalizeImport(i) {
+  i = i || {};
+  return {
+    id: i.id || uid(),
+    title: String(i.title || "").slice(0, 200),
+    detail: String(i.detail || "").slice(0, 500),
+    date: /^\d{4}-\d{2}-\d{2}$/.test(i.date || "") ? i.date : null,
+    source: i.source || "import",
+    added: !!i.added,
+  };
+}
+
+function maybeCancelFocus(taskId) {
+  if (state.focus && state.focus.taskId === taskId) stopFocus(true);
+}
+
+/* ================= v5: lock-in focus timer ================= */
+
+let focusTimerId = null;
+
+function fmtClock(sec) {
+  sec = Math.max(0, Math.round(sec));
+  return String(Math.floor(sec / 60)).padStart(2, "0") + ":" + String(sec % 60).padStart(2, "0");
+}
+
+async function ensureNotifyPerm() {
+  if (!("Notification" in window)) { toast("Notifications aren't supported in this browser"); return false; }
+  if (Notification.permission === "granted") return true;
+  try {
+    const p = await Notification.requestPermission();
+    if (p === "granted") return true;
+  } catch (e) {}
+  toast("Timer started — keep this tab open, since notifications are blocked");
+  return false;
+}
+
+function startFocus(taskId, taskText, goalTitle, minutes) {
+  const totalSec = Math.round(minutes * 60);
+  if (state.focus) stopFocus(true);
+  state.focus = {
+    taskId, taskText, goal: goalTitle || "",
+    totalSec, remainingSec: totalSec, running: true,
+    endsAt: Date.now() + totalSec * 1000,
+  };
+  save();
+  clearInterval(focusTimerId);
+  focusTimerId = setInterval(tickFocus, 1000);
+  renderAll();
+  toast("🔒 Locked in for " + minutes + "m: " + taskText);
+}
+
+function tickFocus() {
+  const f = state.focus;
+  if (!f || !f.running) return;
+  const left = Math.max(0, Math.round((f.endsAt - Date.now()) / 1000));
+  f.remainingSec = left;
+  const timeEl = document.getElementById("focusTime");
+  if (timeEl) timeEl.textContent = fmtClock(left);
+  document.querySelectorAll(".lock-time").forEach((n) => { n.textContent = fmtClock(left); });
+  if (left <= 0) completeFocus();
+}
+
+function pauseFocus() {
+  const f = state.focus;
+  if (!f) return;
+  if (f.running) {
+    f.remainingSec = Math.max(0, Math.round((f.endsAt - Date.now()) / 1000));
+    f.running = false; f.endsAt = 0;
+  } else {
+    f.running = true;
+    f.endsAt = Date.now() + f.remainingSec * 1000;
+  }
+  save(); renderFocusBar();
+}
+
+function stopFocus(silent) {
+  state.focus = null;
+  clearInterval(focusTimerId); focusTimerId = null;
+  save(); renderAll();
+  if (!silent) toast("Focus session ended");
+}
+
+function completeFocus() {
+  const f = state.focus;
+  clearInterval(focusTimerId); focusTimerId = null;
+  state.focus = null;
+  state.focusSessions = (state.focusSessions || 0) + 1;
+  state.xp += 15;
+  recordActivity(); checkMedals(); save();
+  renderAll();
+  chime();
+  speak("Time is up. Great focus session.");
+  toast("⏱️ Time's up: " + (f ? f.taskText : "task") + " (+15 XP)");
+  try {
+    if ("Notification" in window && Notification.permission === "granted") {
+      new Notification("⏱️ Timer up — " + (f ? f.taskText : "task"), {
+        body: "Your lock-in session is complete. +15 XP earned.",
+      });
+    }
+  } catch (e) {}
+}
+
+function chime() {
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    const ctx = new AC();
+    [523.25, 659.25, 783.99].forEach((freq, i) => {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = "sine"; o.frequency.value = freq;
+      const t = ctx.currentTime + i * 0.18;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.25, t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.5);
+      o.connect(g); g.connect(ctx.destination);
+      o.start(t); o.stop(t + 0.55);
+    });
+  } catch (e) {}
+}
+
+function renderFocusBar() {
+  const bar = document.getElementById("focusBar");
+  const f = state.focus;
+  if (!f) { bar.hidden = true; return; }
+  bar.hidden = false;
+  document.getElementById("focusTaskName").textContent = f.taskText;
+  document.getElementById("focusGoalName").textContent = f.goal || "Focus session";
+  document.getElementById("focusTime").textContent = fmtClock(f.remainingSec);
+  document.getElementById("focusPauseBtn").textContent = f.running ? "⏸️" : "▶️";
+}
+
+function toggleTimerPop(li, task, goalTitle) {
+  const old = li.querySelector(":scope > .timer-pop");
+  if (old) { old.remove(); return; }
+  const pop = el("div", "timer-pop");
+  [15, 25, 45, 60].forEach((m) => {
+    const b = el("button", "timer-chip", m + "m");
+    b.type = "button";
+    b.addEventListener("click", async () => {
+      await ensureNotifyPerm();
+      startFocus(task.id, task.text, goalTitle, m);
+    });
+    pop.appendChild(b);
+  });
+  const custom = el("div", "timer-custom");
+  const inp = el("input");
+  inp.type = "number"; inp.min = "1"; inp.max = "180"; inp.placeholder = "min";
+  inp.setAttribute("aria-label", "Custom minutes");
+  const go = el("button", "timer-chip", "Start");
+  go.type = "button";
+  go.addEventListener("click", async () => {
+    const m = Math.min(180, Math.max(1, parseInt(inp.value, 10) || 0));
+    if (!m) { toast("Enter minutes first"); return; }
+    await ensureNotifyPerm();
+    startFocus(task.id, task.text, goalTitle, m);
+  });
+  custom.append(inp, go);
+  pop.appendChild(custom);
+  li.appendChild(pop);
+  inp.focus();
+}
+
+/* ================= v5: connections — imports ================= */
+
+function extractDate(text) {
+  text = String(text || "");
+  let m = text.match(/(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return m[1] + "-" + m[2] + "-" + m[3];
+  m = text.match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+  if (m) {
+    let y = +m[3]; if (y < 100) y += 2000;
+    return y + "-" + String(+m[1]).padStart(2, "0") + "-" + String(+m[2]).padStart(2, "0");
+  }
+  const months = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12 };
+  m = text.toLowerCase().match(/(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+(\d{1,2})/);
+  if (m) {
+    const now = new Date();
+    let y = now.getFullYear();
+    if (new Date(y, months[m[1]] - 1, +m[2]) < new Date(now.getFullYear(), now.getMonth(), now.getDate())) y++;
+    return y + "-" + String(months[m[1]]).padStart(2, "0") + "-" + String(+m[2]).padStart(2, "0");
+  }
+  if (/\btoday\b/i.test(text)) return toDayInput(new Date());
+  if (/\btomorrow\b/i.test(text)) { const d = new Date(); d.setDate(d.getDate() + 1); return toDayInput(d); }
+  return null;
+}
+
+function stripDateSuffix(s) {
+  return s.replace(/\s*(due:?)?\s*(\d{4}-\d{2}-\d{2}|\d{1,2}\/\d{1,2}\/\d{2,4}|(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]* \d{1,2}).*$/i, "").trim() || s;
+}
+
+function parseCSV(text) {
+  const rows = [];
+  let row = [], field = "", inQ = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQ) {
+      if (c === '"') { if (text[i + 1] === '"') { field += '"'; i++; } else inQ = false; }
+      else field += c;
+    } else if (c === '"') inQ = true;
+    else if (c === ",") { row.push(field); field = ""; }
+    else if (c === "\n") { row.push(field); rows.push(row); row = []; field = ""; }
+    else if (c !== "\r") field += c;
+  }
+  row.push(field); rows.push(row);
+  return rows.filter((r) => r.some((v) => v.trim() !== ""));
+}
+
+function rowsToItems(rows) {
+  if (!rows.length) return [];
+  const head = rows[0].map((h) => h.trim().toLowerCase());
+  const idx = (names) => head.findIndex((h) => names.some((n) => h.includes(n)));
+  let ti = 0, di = -1, dti = -1, body = rows;
+  if (head.some((h) => /task|title|name|todo|item/.test(h))) {
+    ti = idx(["task", "title", "name", "todo", "item"]);
+    if (ti < 0) ti = 0;
+    di = idx(["detail", "note", "desc"]);
+    dti = idx(["date", "due", "deadline"]);
+    body = rows.slice(1);
+  }
+  return body.map((r) => {
+    const rawTitle = (r[ti] || "").trim();
+    return {
+      title: stripDateSuffix(rawTitle),
+      detail: di >= 0 ? (r[di] || "").trim() : "",
+      date: dti >= 0 ? extractDate(r[dti] || "") : extractDate(rawTitle),
+    };
+  });
+}
+
+function addImports(items, source) {
+  let n = 0;
+  items.forEach((it) => {
+    const title = String(it.title || "").trim();
+    if (!title) return;
+    state.imports.push(normalizeImport({ title, detail: it.detail, date: it.date, source }));
+    n++;
+  });
+  save(); renderImports();
+  toast(n ? "Imported " + n + " item" + (n > 1 ? "s" : "") + " from " + source : "Nothing to import");
+}
+
+function renderImports() {
+  const list = document.getElementById("importList");
+  if (!list) return;
+  list.innerHTML = "";
+  const items = state.imports.filter((i) => !i.added);
+  document.getElementById("importCount").textContent = items.length;
+  if (!items.length) {
+    list.appendChild(el("li", "fine-print",
+      state.imports.length ? "All imported items have been organized. 🎉" : "Nothing imported yet — bring in a file, some pasted text, or a sheet link above."));
+    return;
+  }
+  items.slice().reverse().forEach((it) => {
+    const li = el("li", "import-row");
+    li.appendChild(el("span", "src-badge", it.source));
+    const wrap = el("span", "task-text", it.title);
+    if (it.detail) wrap.title = it.detail;
+    wrap.style.flex = "1";
+    li.appendChild(wrap);
+    if (it.date) {
+      const info = deadlineInfo(it.date);
+      li.appendChild(el("span", "import-date", info ? info.text : it.date));
+    }
+    const x = el("button", "task-del", "✕");
+    x.type = "button"; x.setAttribute("aria-label", "Remove import");
+    x.addEventListener("click", () => {
+      state.imports = state.imports.filter((i) => i.id !== it.id);
+      save(); renderImports();
+    });
+    li.appendChild(x);
+    list.appendChild(li);
+  });
+}
+
+document.getElementById("importFileBtn").addEventListener("click", () =>
+  document.getElementById("importFile").click());
+
+document.getElementById("importFile").addEventListener("change", (e) => {
+  const f = e.target.files[0];
+  if (!f) return;
+  const rd = new FileReader();
+  rd.onload = () => {
+    try {
+      const text = String(rd.result || "");
+      let items;
+      if (/\.json$/i.test(f.name)) {
+        const arr = JSON.parse(text);
+        const list = Array.isArray(arr) ? arr : [arr];
+        items = list.map((o) => typeof o === "string"
+          ? { title: stripDateSuffix(o), date: extractDate(o) }
+          : { title: stripDateSuffix(String(o.title || o.task || o.name || "")), detail: String(o.detail || o.notes || o.description || ""), date: extractDate(o.date || o.due || o.deadline || o.title || "") });
+      } else {
+        items = rowsToItems(parseCSV(text));
+      }
+      addImports(items, f.name);
+    } catch (err) { toast("Couldn't read that file"); }
+    e.target.value = "";
+  };
+  rd.readAsText(f);
+});
+
+document.getElementById("pasteImportBtn").addEventListener("click", () => {
+  const ta = document.getElementById("pasteImport");
+  const lines = ta.value.split("\n").map((l) => l.trim()).filter(Boolean);
+  const items = lines.map((l) => {
+    const clean = l.replace(/^[-*•\d.)\]]\s+/, "");
+    return { title: stripDateSuffix(clean), date: extractDate(clean) };
+  });
+  addImports(items, "pasted text");
+  ta.value = "";
+});
+
+function sheetCsvUrl(url) {
+  url = (url || "").trim();
+  const m = url.match(/docs\.google\.com\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+  if (m) return "https://docs.google.com/spreadsheets/d/" + m[1] + "/gviz/tq?tqx=out:csv";
+  return url;
+}
+
+document.getElementById("sheetImportBtn").addEventListener("click", async () => {
+  const input = document.getElementById("sheetUrl");
+  const raw = input.value.trim();
+  if (!raw) { toast("Paste a sheet or CSV link first"); return; }
+  toast("Fetching sheet…");
+  try {
+    const res = await fetch(sheetCsvUrl(raw));
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const text = await res.text();
+    if (!text || /<html/i.test(text.slice(0, 300))) throw new Error("not-csv");
+    addImports(rowsToItems(parseCSV(text)), "google sheet");
+    input.value = "";
+  } catch (e) {
+    toast("Couldn't fetch that sheet — publish it to the web as CSV and try again");
+  }
+});
+
+/* ================= v5: pathfinder — on-device interpreter ================= */
+
+const PATH_KEYWORDS = {
+  career: ["job", "interview", "resume", "portfolio", "behance", "dribbble", "client", "meeting", "email", "project", "course", "learn", "study", "design", "code", "website", "linkedin", "application", "salary", "promotion", "work", "presentation", "freelance", "boss", "office"],
+  health: ["gym", "workout", "run", "walk", "doctor", "dentist", "health", "sleep", "diet", "water", "yoga", "meditat", "vitamin", "exercise", "steps", "weight", "therapy", "checkup", "hospital", "clinic"],
+  personal: ["money", "save", "savings", "rent", "house", "budget", "bill", "bank", "family", "mom", "dad", "friend", "birthday", "gift", "travel", "trip", "car", "home", "clean", "grocer", "shop", "flight", "hotel"],
+  private: ["password", "secret", "private", "journal", "diary"],
+};
+
+function classifyItem(text) {
+  const t = " " + String(text || "").toLowerCase() + " ";
+  let best = null, bestScore = 0;
+  for (const cat of Object.keys(PATH_KEYWORDS)) {
+    let s = 0;
+    PATH_KEYWORDS[cat].forEach((w) => { if (t.includes(w)) s += w.length > 5 ? 2 : 1; });
+    if (s > bestScore) { bestScore = s; best = cat; }
+  }
+  return { category: best, score: bestScore };
+}
+
+function pathCandidates() {
+  const out = [];
+  state.goals.forEach((g) => {
+    g.tasks.forEach((t) => {
+      if (taskDone(t)) return;
+      const open = leavesOf(t).filter((l) => !l.done).length;
+      out.push({ kind: "task", ref: t, title: t.text, date: t.deadline, goal: g.title, category: g.category, size: Math.max(1, open) });
+    });
+  });
+  state.imports.filter((i) => !i.added).forEach((i) => {
+    const c = classifyItem(i.title + " " + i.detail);
+    out.push({ kind: "import", ref: i, title: i.title, date: i.date || extractDate(i.title + " " + i.detail), goal: "Imported", category: c.category, score: c.score, size: 1 });
+  });
+  return out;
+}
+
+function ensureInboxGoal(catId) {
+  const title = "📥 " + catOf(catId).name + " inbox";
+  let g = state.goals.find((g) => g.title === title);
+  if (!g) {
+    g = normalizeGoal({ icon: "📥", title, timeline: "", category: catId, tasks: [] });
+    state.goals.push(g);
+  }
+  return g;
+}
+
+function analyzePath() {
+  const cands = pathCandidates();
+  cands.forEach((c) => {
+    const info = c.date ? deadlineInfo(c.date) : null;
+    c.urgency = info ? (info.diff < 0 ? 0 : info.diff === 0 ? 1 : info.diff <= 2 ? 2 : 3) : 4;
+    c.xp = 10 * Math.max(1, c.size);
+  });
+  cands.sort((a, b) => a.urgency - b.urgency || b.size - a.size);
+
+  const list = document.getElementById("pathList");
+  list.innerHTML = "";
+  const top = cands.slice(0, 8);
+  if (!top.length) list.appendChild(el("li", "fine-print", "Nothing open — enjoy the calm. ✨"));
+  top.forEach((c) => {
+    const li = el("li", "path-step" + (c.urgency <= 1 ? " urgent" : ""));
+    const body = el("div", "path-body");
+    body.appendChild(el("strong", null, c.title));
+    const meta = el("div", "path-meta");
+    const cat = catOf(c.category || "personal");
+    meta.appendChild(el("span", "cat-chip", cat.icon + " " + cat.name));
+    if (c.date) { const info = deadlineInfo(c.date); if (info) meta.appendChild(el("span", null, "📅 " + info.text)); }
+    meta.appendChild(el("span", null, c.kind === "import" ? "📥 imported" : "🎯 " + c.goal));
+    meta.appendChild(el("span", "xp-chip", "+" + c.xp + " XP"));
+    body.appendChild(meta);
+    const acts = el("div", "path-actions");
+    const lock = el("button", "path-lock", "🔒 Lock in");
+    lock.type = "button";
+    lock.addEventListener("click", async () => {
+      await ensureNotifyPerm();
+      startFocus(c.kind === "task" ? c.ref.id : "import:" + c.ref.id, c.title, c.goal, 25);
+    });
+    acts.appendChild(lock);
+    li.append(body, acts);
+    list.appendChild(li);
+  });
+
+  const box = document.getElementById("suggestList");
+  box.innerHTML = "";
+  const suggs = cands.filter((c) => c.kind === "import").slice(0, 12);
+  if (!suggs.length) {
+    box.appendChild(el("p", "fine-print", "No imported items waiting — import something from Connections first."));
+  }
+  suggs.forEach((c) => {
+    const catId = c.category || "personal";
+    const cat = catOf(catId);
+    const card = el("div", "suggest-card");
+    card.appendChild(el("span", "src-badge", "import"));
+    card.appendChild(el("span", "task-text", c.title));
+    card.appendChild(el("span", "cat-chip", cat.icon + " " + cat.name));
+    if (!c.category) card.appendChild(el("span", "conf-tag", "best guess"));
+    const add = el("button", "suggest-add", "＋ Add as quest");
+    add.type = "button";
+    add.addEventListener("click", () => {
+      const item = state.imports.find((i) => i.id === c.ref.id);
+      if (!item || item.added) return;
+      const g = ensureInboxGoal(catId);
+      g.tasks.push(normalizeTask({ text: item.title, deadline: item.date }));
+      item.added = true;
+      save(); renderAll();
+      toast("Quest added to " + cat.name + " inbox 🎯");
+      analyzePath();
+    });
+    card.appendChild(add);
+    box.appendChild(card);
+  });
+
+  document.getElementById("pathResults").hidden = false;
+}
+
+document.getElementById("analyzeBtn").addEventListener("click", analyzePath);
+
+/* ================= v5: focus bar wiring + boot resume ================= */
+
+document.getElementById("focusPauseBtn").addEventListener("click", pauseFocus);
+document.getElementById("focusStopBtn").addEventListener("click", () => stopFocus());
+
+(function resumeFocus() {
+  const f = state.focus;
+  if (!f) return;
+  if (f.running && f.endsAt) {
+    const left = Math.round((f.endsAt - Date.now()) / 1000);
+    if (left <= 0) { completeFocus(); return; }
+    f.remainingSec = left;
+    focusTimerId = setInterval(tickFocus, 1000);
+  } else if (f.running) {
+    f.running = false;
+  }
+  renderFocusBar();
+})();
