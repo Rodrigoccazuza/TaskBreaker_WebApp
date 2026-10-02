@@ -4,13 +4,13 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Task Breaker — Progress Tracker</title>
-<meta name="description" content="Task Breaker: break big goals into small tasks and track your progress." />
+<meta name="description" content="Task Breaker: break big goals into small tasks, earn XP and medals." />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="styles.css" />
 </head>
-<body data-theme="dark">
+<body data-theme="light">
 <div class="app">
 
   <!-- ============ SIDEBAR ============ -->
@@ -25,16 +25,19 @@
 
     <nav class="nav" aria-label="Sections">
       <button type="button" class="nav-btn active" data-page="dashboard"><span class="nav-icon">📊</span>Dashboard</button>
+      <button type="button" class="nav-btn" data-page="weekly"><span class="nav-icon">📅</span>Weekly</button>
+      <button type="button" class="nav-btn" data-page="rewards"><span class="nav-icon">🏆</span>Rewards</button>
       <button type="button" class="nav-btn" data-page="wishlist"><span class="nav-icon">⭐</span>Wishlist</button>
       <button type="button" class="nav-btn" data-page="notes"><span class="nav-icon">📝</span>Notes</button>
+      <button type="button" class="nav-btn" data-page="digest"><span class="nav-icon">✉️</span>Digest</button>
       <button type="button" class="nav-btn" data-page="profile"><span class="nav-icon">👤</span>Profile</button>
     </nav>
 
     <div class="sidebar-bottom">
       <label class="theme-toggle" title="Toggle light / dark mode">
         <input type="checkbox" id="themeToggle" />
-        <span class="switch"><span class="knob">🌙</span></span>
-        <span class="theme-label" id="themeLabel">Dark mode</span>
+        <span class="switch"><span class="knob">☀️</span></span>
+        <span class="theme-label" id="themeLabel">Light mode</span>
       </label>
       <p class="today" id="todayLabel"></p>
     </div>
@@ -52,8 +55,8 @@
         </div>
       </header>
 
+      <div id="alertsStrip"></div>
       <div class="wheels" id="wheelsRow" aria-label="Progress by category"></div>
-
       <div id="goalsByCategory"></div>
 
       <article class="card add-goal-card">
@@ -67,9 +70,52 @@
             <option value="private">🔒 Private</option>
           </select>
           <input type="text" id="newGoalTimeline" placeholder="Timeline (e.g. 2 months)" maxlength="30" autocomplete="off" />
-          <button type="button" class="btn-brass" id="addGoalBtn">Add goal</button>
+          <input type="date" id="newGoalDeadline" aria-label="Deadline (optional)" title="Deadline (optional)" />
+          <button type="button" class="btn-primary" id="addGoalBtn">Add goal</button>
         </div>
       </article>
+    </section>
+
+    <!-- WEEKLY -->
+    <section class="page" id="page-weekly">
+      <header class="page-head">
+        <div>
+          <h2>Weekly Routines</h2>
+          <p class="page-sub">Recurring tasks that reset every Monday. Tap a day to check it off.</p>
+        </div>
+      </header>
+      <div id="routineList"></div>
+      <article class="card">
+        <h3>＋ New routine</h3>
+        <div class="routine-form">
+          <input type="text" id="routineInput" placeholder="e.g. Morning run…" maxlength="80" autocomplete="off" />
+          <div class="day-picker" id="routineDays" aria-label="Days"></div>
+          <button type="button" class="btn-primary" id="addRoutineBtn">Add</button>
+        </div>
+      </article>
+    </section>
+
+    <!-- REWARDS -->
+    <section class="page" id="page-rewards">
+      <header class="page-head">
+        <div>
+          <h2>Rewards</h2>
+          <p class="page-sub">Points, streaks and medals. Keep the chain going.</p>
+        </div>
+      </header>
+      <article class="card level-card">
+        <div class="level-top">
+          <span class="level-badge" id="levelBadge">1</span>
+          <div class="level-info">
+            <h3 id="levelTitle">Level 1</h3>
+            <div class="xp-bar"><div class="xp-fill" id="xpFill"></div></div>
+            <p class="xp-text" id="xpText"></p>
+          </div>
+          <div class="streak-pill" id="streakPill">🔥 0</div>
+        </div>
+      </article>
+      <h3 class="section-title">Medals</h3>
+      <div class="medals-grid" id="medalsGrid"></div>
     </section>
 
     <!-- WISHLIST -->
@@ -83,7 +129,7 @@
       <article class="card">
         <form class="add-row" id="wishlistForm">
           <input type="text" id="wishlistInput" placeholder="Add something to your wishlist…" maxlength="120" autocomplete="off" />
-          <button type="submit" class="btn-brass">Add</button>
+          <button type="submit" class="btn-primary">Add</button>
         </form>
         <ul class="check-list" id="wishlistList"></ul>
       </article>
@@ -100,11 +146,57 @@
       <article class="card">
         <div class="note-form">
           <input type="text" id="noteTitle" placeholder="Note title…" maxlength="80" autocomplete="off" />
-          <textarea id="noteBody" rows="3" placeholder="Write your note…" maxlength="1000"></textarea>
-          <button type="button" class="btn-brass" id="addNoteBtn">Pin note</button>
+          <div class="voice-row">
+            <textarea id="noteBody" rows="3" placeholder="Write your note…" maxlength="1000"></textarea>
+            <button type="button" class="mic-btn" id="noteMic" title="Dictate note">🎤</button>
+          </div>
+          <button type="button" class="btn-primary" id="addNoteBtn">Pin note</button>
         </div>
       </article>
       <div class="notes-grid" id="notesGrid"></div>
+    </section>
+
+    <!-- DIGEST -->
+    <section class="page" id="page-digest">
+      <header class="page-head">
+        <div>
+          <h2>Weekly Digest</h2>
+          <p class="page-sub">A summary of your week, ready to email to yourself.</p>
+        </div>
+      </header>
+      <article class="card">
+        <h3>Digest settings</h3>
+        <div class="digest-form">
+          <label>Email<input type="text" id="digestEmail" placeholder="you@example.com" maxlength="120" autocomplete="off" /></label>
+          <div class="digest-row">
+            <label>Day
+              <select id="digestDay">
+                <option value="1">Monday</option>
+                <option value="2">Tuesday</option>
+                <option value="3">Wednesday</option>
+                <option value="4">Thursday</option>
+                <option value="5">Friday</option>
+                <option value="6">Saturday</option>
+                <option value="0">Sunday</option>
+              </select>
+            </label>
+            <label>Time<input type="time" id="digestTime" value="08:00" /></label>
+          </div>
+          <div class="check-row">
+            <label><input type="checkbox" id="digestGoals" checked /> Goal progress</label>
+            <label><input type="checkbox" id="digestRoutines" checked /> Weekly routines</label>
+            <label><input type="checkbox" id="digestWishlist" checked /> Wishlist</label>
+          </div>
+          <button type="button" class="btn-primary" id="saveDigestBtn">Save settings</button>
+        </div>
+      </article>
+      <article class="card">
+        <h3>Send it now</h3>
+        <p class="digest-note">This opens a pre-written email with your current digest. One tap to send.</p>
+        <div class="digest-preview" id="digestPreview"></div>
+        <button type="button" class="btn-primary" id="sendDigestBtn">✉️ Email my digest</button>
+        <p class="fine-print">Fully automatic sending (no taps needed) requires a small server component, which this static app doesn't have yet. The settings above are saved and ready for it.</p>
+      </article>
     </section>
 
     <!-- PROFILE -->
@@ -131,10 +223,25 @@
         </dl>
         <div class="profile-stats" id="profileStats"></div>
       </article>
+      <article class="card">
+        <h3>Settings</h3>
+        <div class="settings-list">
+          <label class="setting-row">
+            <span>🎉 Spoken celebrations <small>Hear a cheer when you finish a goal</small></span>
+            <span class="mini-switch"><input type="checkbox" id="setVoice" /><span class="mini-knob"></span></span>
+          </label>
+          <label class="setting-row">
+            <span>⏰ Deadline alerts <small>Browser notification for urgent deadlines</small></span>
+            <span class="mini-switch"><input type="checkbox" id="setNotify" /><span class="mini-knob"></span></span>
+          </label>
+        </div>
+      </article>
     </section>
 
   </main>
 </div>
+
+<div class="toast" id="toast" role="status"></div>
 
 <script src="app.js"></script>
 </body>
