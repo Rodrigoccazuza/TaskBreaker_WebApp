@@ -59,3 +59,17 @@ python3 -m http.server 8000
 - Due dates and reminders
 - Streaks and weekly summaries
 - Cloud sync / accounts
+
+## v5 — Lock-in timer, Connections, Pathfinder (Oct 2026)
+
+- **🔒 Lock-in focus timer:** every task has a timer button. Pick 15/25/45/60 minutes or a custom
+  length, and a floating focus bar counts down. Pause/resume, and when time is up you get a browser
+  notification, a chime, and +15 XP. The timer survives page reloads.
+- **🔗 Connections:** import tasks from your other tools — upload a CSV/JSON file (Google Sheets:
+  File → Download → CSV; Notion: Export → CSV), paste a list, or fetch a published Google Sheet
+  link. Items land in an import inbox with source labels and date detection.
+- **🧭 Pathfinder:** an on-device interpreter. One tap analyzes open tasks + imports, sorts each
+  into your Career/Health/Personal/Private categories by keyword, and builds "Today's quest path"
+  ordered by urgency and impact. Suggestions can be sent into per-category inbox goals with one tap.
+  Note: live two-way sync (Notion/Google OAuth) isn't possible on a static page with no server —
+  import is the viable path, and everything stays on your device.
