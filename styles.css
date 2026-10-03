@@ -18,6 +18,17 @@ body[data-theme="light"] {
   --gold: #e8a83c;
   --gold-deep: #bd7f22;
   --danger: #df6b6b;
+  --danger-deep: #b84a4a;
+  --danger-soft: rgba(223, 107, 107, 0.13);
+  --danger-glow: rgba(223, 107, 107, 0.30);
+  --success: #3d9e58;
+  --success-deep: #2b7a41;
+  --success-soft: rgba(61, 158, 88, 0.13);
+  --success-glow: rgba(61, 158, 88, 0.30);
+  --warning: #f0b429;
+  --warning-deep: #9a6b08;
+  --warning-soft: rgba(240, 180, 41, 0.16);
+  --accent-soft: rgba(235, 108, 55, 0.12);
   --card-shadow: 8px 8px 16px var(--sh-dark), -8px -8px 16px var(--sh-light);
   --inset-shadow: inset 6px 6px 12px var(--sh-dark), inset -6px -6px 12px var(--sh-light);
   --small-shadow: 4px 4px 8px var(--sh-dark), -4px -4px 8px var(--sh-light);
@@ -39,6 +50,17 @@ body[data-theme="dark"] {
   --gold: #e8a83c;
   --gold-deep: #d99a35;
   --danger: #e07c7c;
+  --danger-deep: #c05c5c;
+  --danger-soft: rgba(224, 124, 124, 0.15);
+  --danger-glow: rgba(224, 124, 124, 0.28);
+  --success: #4cc06e;
+  --success-deep: #359a54;
+  --success-soft: rgba(76, 192, 110, 0.15);
+  --success-glow: rgba(76, 192, 110, 0.28);
+  --warning: #f2bc45;
+  --warning-deep: #d99a35;
+  --warning-soft: rgba(242, 188, 69, 0.15);
+  --accent-soft: rgba(242, 129, 75, 0.14);
   --card-shadow: 8px 8px 16px var(--sh-dark), -8px -8px 16px var(--sh-light);
   --inset-shadow: inset 6px 6px 12px var(--sh-dark), inset -6px -6px 12px var(--sh-light);
   --small-shadow: 4px 4px 8px var(--sh-dark), -4px -4px 8px var(--sh-light);
@@ -350,7 +372,7 @@ body {
 
 .goal-card { margin-bottom: 0; padding: 22px; position: relative; }
 
-.goal-card.complete { box-shadow: var(--card-shadow), 0 0 0 3px var(--gold); }
+.goal-card.complete { box-shadow: var(--card-shadow), 0 0 0 3px var(--success); }
 
 .goal-top { display: flex; align-items: flex-start; gap: 12px; }
 
@@ -382,7 +404,10 @@ body {
 
 .badge.cat { color: var(--accent); }
 .badge.due-over { color: var(--danger); font-weight: 700; }
-.badge.due-soon { color: var(--gold-deep); font-weight: 700; }
+.badge.due-soon { color: var(--warning-deep); font-weight: 700; }
+.badge.ok { color: var(--success-deep); font-weight: 700; }
+.badge.warn { color: var(--warning-deep); font-weight: 700; }
+.badge.bad { color: var(--danger); font-weight: 700; }
 
 .icon-btn {
   background: var(--bg);
@@ -418,8 +443,9 @@ body {
   width: 0%;
   border-radius: 999px;
   background: linear-gradient(90deg, var(--accent), var(--accent-deep));
-  transition: width 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: width 0.6s cubic-bezier(0.22, 1, 0.36, 1), background 0.3s ease;
 }
+.progress-fill.done, .mini-fill.done { background: linear-gradient(90deg, var(--success), var(--success-deep)); }
 
 .progress-text { font-size: 12.5px; color: var(--muted); min-width: 70px; text-align: right; font-variant-numeric: tabular-nums; }
 
@@ -481,6 +507,7 @@ body {
 .task-list li:hover .task-del, .task-list li:hover .task-sub-btn, .task-list li:hover .task-cal-btn { opacity: 1; }
 .task-del:hover { color: var(--danger); }
 .task-sub-btn:hover, .task-cal-btn:hover { color: var(--accent); }
+.task-del:hover, .icon-btn.danger:hover { color: var(--danger); }
 
 .subtask-wrap {
   margin: 8px 0 4px 34px;
@@ -598,42 +625,72 @@ input[type="checkbox"]:not(.task-check):checked::after {
 }
 
 /* ---------- buttons ---------- */
-.btn-primary {
+/* ============ button system ============
+   primary: orange CTA | secondary: neumorphic quiet pill | tertiary: text-only
+   dark: near-black pill (inverts in dark mode) | danger: red destructive
+   states: default / hover / active / focus-visible / disabled */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   font-family: var(--font-body);
   font-size: 14px;
   font-weight: 600;
+  border: none;
+  border-radius: 16px;
+  padding: 12px 22px;
+  cursor: pointer;
+  white-space: nowrap;
+  text-decoration: none;
+  transition: filter 0.12s ease, box-shadow 0.12s ease, transform 0.12s ease, background-color 0.12s ease, color 0.12s ease;
+}
+.btn .bi { font-size: 1.1em; }
+.btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btn:disabled, .btn.disabled { opacity: 0.45; cursor: not-allowed; transform: none; filter: none; box-shadow: var(--small-shadow); }
+
+.btn-primary {
   color: var(--accent-ink);
   background: linear-gradient(145deg, var(--accent), var(--accent-deep));
-  border: none;
-  border-radius: 16px;
-  padding: 12px 22px;
-  cursor: pointer;
   box-shadow: 4px 4px 10px var(--sh-dark), -4px -4px 10px var(--sh-light), 0 10px 24px var(--accent-glow);
-  transition: filter 0.12s ease, box-shadow 0.12s ease, transform 0.12s ease;
-  white-space: nowrap;
 }
-
 .btn-primary:hover { filter: brightness(1.06); }
-.btn-primary:active { box-shadow: var(--small-inset); transform: translateY(1px); }
+.btn-primary:active { transform: translateY(1px); box-shadow: var(--small-inset); }
 
-/* near-black pill from the style guide (inverts to off-white pill in dark mode) */
+.btn-secondary {
+  color: var(--text);
+  background: var(--bg);
+  box-shadow: var(--small-shadow);
+}
+.btn-secondary:hover { color: var(--accent); }
+.btn-secondary:active { transform: translateY(1px); box-shadow: var(--small-inset); }
+
+.btn-tertiary {
+  color: var(--muted);
+  background: transparent;
+  box-shadow: none;
+  padding: 12px 14px;
+}
+.btn-tertiary:hover { color: var(--accent); background: var(--accent-soft); }
+.btn-tertiary:active { transform: translateY(1px); color: var(--accent-deep); }
+
 .btn-dark {
-  font-family: var(--font-body);
-  font-size: 14px;
-  font-weight: 600;
   color: var(--ink-text);
   background: var(--ink);
-  border: none;
-  border-radius: 16px;
-  padding: 12px 22px;
-  cursor: pointer;
   box-shadow: 4px 4px 10px var(--sh-dark), -4px -4px 10px var(--sh-light), 0 10px 24px rgba(0, 0, 0, 0.25);
-  transition: filter 0.12s ease, box-shadow 0.12s ease, transform 0.12s ease;
-  white-space: nowrap;
 }
-
 .btn-dark:hover { filter: brightness(1.12); }
 .btn-dark:active { transform: translateY(1px); box-shadow: var(--small-inset); }
+
+.btn-danger {
+  color: #fff;
+  background: linear-gradient(145deg, var(--danger), var(--danger-deep));
+  box-shadow: 4px 4px 10px var(--sh-dark), -4px -4px 10px var(--sh-light), 0 10px 24px var(--danger-glow);
+}
+.btn-danger:hover { filter: brightness(1.06); }
+.btn-danger:active { transform: translateY(1px); box-shadow: var(--small-inset); }
+
+.btn-sm { padding: 8px 14px; font-size: 12px; border-radius: 12px; }
 
 .add-task { display: flex; gap: 8px; margin-top: 10px; }
 .add-task .btn-primary { padding: 12px 18px; font-size: 18px; line-height: 1; }
@@ -975,6 +1032,9 @@ input[type="checkbox"]:not(.task-check):checked::after {
 .mini-switch input:checked + .mini-knob { background: linear-gradient(145deg, var(--accent), var(--accent-deep)); box-shadow: var(--small-inset), 0 0 0 2px var(--accent); }
 
 /* ---------- toast ---------- */
+.toast.success { box-shadow: var(--card-shadow), 0 0 0 2px var(--success); }
+.toast.warning { box-shadow: var(--card-shadow), 0 0 0 2px var(--warning); }
+.toast.danger { box-shadow: var(--card-shadow), 0 0 0 2px var(--danger); }
 .toast {
   position: fixed;
   bottom: 26px;
@@ -1081,8 +1141,7 @@ input[type="checkbox"]:not(.task-check):checked::after {
 .path-lock:active { transform: translateY(1px); }
 .suggest-card { display: flex; gap: 12px; align-items: center; background: var(--bg); border-radius: 16px; padding: 14px 16px; box-shadow: var(--small-shadow); margin-bottom: 10px; flex-wrap: wrap; }
 .suggest-card .task-text { flex: 1; min-width: 180px; font-size: 14px; }
-.suggest-add { border: none; cursor: pointer; font-family: var(--font-body); font-size: 12px; font-weight: 700; color: var(--accent-deep); background: var(--bg); border-radius: 10px; padding: 8px 14px; box-shadow: var(--small-shadow); }
-.suggest-add:active { box-shadow: var(--small-inset); }
+/* .suggest-add retired: now .btn .btn-tertiary .btn-sm */
 .conf-tag { font-size: 11px; color: var(--muted); }
 
 @media (max-width: 640px) {
