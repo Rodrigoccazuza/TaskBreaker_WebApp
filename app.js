@@ -44,17 +44,55 @@ function el(tag, cls, text) {
   return n;
 }
 
-/* feather icons (bundled locally): <svg> line icons, currentColor stroke */
+/* bootstrap line icons (CDN font): <i> glyphs inherit text color */
+const BI_MAP = {
+ "zap": "lightning-charge",
+ "bar-chart-2": "bar-chart-line",
+ "calendar": "calendar",
+ "award": "award",
+ "star": "star",
+ "file-text": "file-text",
+ "mail": "envelope",
+ "user": "person",
+ "link": "link-45deg",
+ "compass": "compass",
+ "briefcase": "briefcase",
+ "activity": "activity",
+ "smile": "emoji-smile",
+ "lock": "lock",
+ "target": "bullseye",
+ "film": "film",
+ "home": "house",
+ "heart": "heart",
+ "flag": "flag",
+ "check-circle": "check-circle",
+ "trending-up": "graph-up-arrow",
+ "sliders": "sliders",
+ "crosshair": "crosshair",
+ "moon": "moon",
+ "sun": "sun",
+ "bell": "bell",
+ "x": "x",
+ "plus": "plus",
+ "mic": "mic",
+ "pause": "pause",
+ "play": "play",
+ "square": "square",
+ "clock": "clock",
+ "inbox": "inbox",
+ "map": "map",
+ "clipboard": "clipboard",
+ "file": "file-earmark",
+ "database": "database",
+ "map-pin": "geo-alt",
+ "volume-2": "volume-up"
+};
 function icon(name, size) {
-  try {
-    const lib = window.feather && window.feather.icons;
-    const ic = lib && lib[name];
-    if (ic) return ic.toSvg({ width: size || 24, height: size || 24, class: "fi" });
-  } catch (e) {}
-  return "";
+  const bi = BI_MAP[name] || name;
+  return '<i class="bi bi-' + bi + '"></i>';
 }
 function setIcon(node, name, size) {
-  node.innerHTML = icon(name, size || 18);
+  node.innerHTML = icon(name, size);
   return node;
 }
 
@@ -1229,7 +1267,6 @@ attachMic(document.getElementById("noteMic"), document.getElementById("noteBody"
 
 applyTheme();
 loadDigestForm();
-try { if (window.feather) window.feather.replace(); } catch (e) {}
 state.streak = computeStreak();
 checkMedals();
 save();
