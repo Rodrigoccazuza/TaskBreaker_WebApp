@@ -242,6 +242,7 @@ function blankState() {
     focus: null,
     imports: [],
     focusSessions: 0,
+    ui: { skipGoalDeleteConfirm: false },
   };
 }
 
@@ -263,6 +264,7 @@ function normalize(data) {
     focus: normalizeFocus(data.focus),
     imports: (data.imports || []).map(normalizeImport),
     focusSessions: +data.focusSessions || 0,
+    ui: { skipGoalDeleteConfirm: !!(data.ui && data.ui.skipGoalDeleteConfirm) },
   };
 }
 
@@ -282,11 +284,79 @@ function load() {
   return blankState();
 }
 
+/* ============ undo / redo ============
+   Every save() snapshots the pre-change state (coalesced per synchronous
+   burst so one user action = one undo step). The live focus timer is kept
+   out of snapshots so undo never kills a running session. */
+const undoStack = [];
+const redoStack = [];
+const UNDO_LIMIT = 60;
+let lastCommittedJson = null;
+let burstBase = null;
+let suppressSnapshot = false;
+
+function stateSnapshotJson() {
+  return JSON.stringify(state, (k, v) => (k === "focus" ? undefined : v));
+}
+function flushBurst() {
+  const base = burstBase;
+  burstBase = null;
+  if (base != null && base !== lastCommittedJson) {
+    undoStack.push(base);
+    if (undoStack.length > UNDO_LIMIT) undoStack.shift();
+    redoStack.length = 0;
+  }
+  updateUndoButtons();
+}
 function save() {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
+  const json = JSON.stringify(state);
+  try { localStorage.setItem(STORAGE_KEY, json); } catch (e) {}
+  const snap = stateSnapshotJson();
+  if (suppressSnapshot) { lastCommittedJson = snap; return; }
+  if (burstBase === null) {
+    burstBase = lastCommittedJson;
+    queueMicrotask(flushBurst);
+  }
+  lastCommittedJson = snap;
+}
+function restoreSnapshot(json) {
+  const keepFocus = state.focus;
+  const data = JSON.parse(json);
+  for (const k of Object.keys(state)) delete state[k];
+  Object.assign(state, data);
+  state.focus = keepFocus || null;
+  suppressSnapshot = true;
+  save();
+  suppressSnapshot = false;
+  renderAll();
+  if (modalTaskId) renderTaskModal();
+  updateUndoButtons();
+}
+function undo() {
+  if (!undoStack.length) { toast("Nothing to undo"); return; }
+  redoStack.push(stateSnapshotJson());
+  restoreSnapshot(undoStack.pop());
+  toast("Undone");
+}
+function redo() {
+  if (!redoStack.length) { toast("Nothing to redo"); return; }
+  undoStack.push(stateSnapshotJson());
+  restoreSnapshot(redoStack.pop());
+  toast("Redone");
+}
+function updateUndoButtons() {
+  const u = document.getElementById("undoBtn");
+  const r = document.getElementById("redoBtn");
+  if (u) u.disabled = !undoStack.length;
+  if (r) r.disabled = !redoStack.length;
+}
+function undoHint() {
+  const mac = navigator.platform && navigator.platform.toUpperCase().indexOf("MAC") >= 0;
+  return (mac ? "\u2318Z" : "Ctrl+Z") + " to undo";
 }
 
 const state = load();
+if (!state.ui) state.ui = { skipGoalDeleteConfirm: false };
 
 /* ================= task tree ================= */
 
@@ -708,7 +778,17 @@ function taskNode(task, removeTask, afterChange, goalTitle) {
   const x = setIcon(el("button", "task-del"), "x", 13);
   x.type = "button";
   x.setAttribute("aria-label", "Delete task");
-  x.addEventListener("click", () => removeTask(task));
+  x.addEventListener("click", async () => {
+    if (task.subtasks && task.subtasks.length) {
+      const r = await confirmAction({
+        title: "Delete this task?",
+        message: "\u201C" + task.text + "\u201D and its " + task.subtasks.length + " subtask" + (task.subtasks.length === 1 ? "" : "s") + " will be permanently deleted.",
+        confirmText: "Delete task",
+      });
+      if (!r.result) return;
+    }
+    removeTask(task);
+  });
 
   const tools = el("div", "task-tools");
   tools.append(calBtn, lockBtn, subBtn, x);
@@ -825,11 +905,20 @@ function goalCard(goal) {
   const del = setIcon(el("button", "icon-btn"), "x", 14);
   del.title = "Delete goal";
   del.setAttribute("aria-label", "Delete goal");
-  del.addEventListener("click", () => {
-    if (confirm('Delete the goal "' + goal.title + '"?')) {
-      state.goals = state.goals.filter((g) => g.id !== goal.id);
-      save(); renderAll();
+    del.addEventListener("click", async () => {
+    if (!state.ui.skipGoalDeleteConfirm) {
+      const r = await confirmAction({
+        title: "Delete this goal?",
+        message: "\u201C" + goal.title + "\u201D and all of its tasks will be permanently deleted.",
+        confirmText: "Delete goal",
+        checkboxLabel: "Don't ask me again",
+      });
+      if (!r.result) return;
+      if (r.dontAsk) state.ui.skipGoalDeleteConfirm = true;
     }
+    state.goals = state.goals.filter((g) => g.id !== goal.id);
+    save(); renderAll();
+    toast("Goal deleted \u2014 " + undoHint(), "warning");
   });
   top.append(calBtn, del);
   card.appendChild(top);
@@ -1885,7 +1974,15 @@ function detailNode(task) {
   const del = setIcon(el("button", "icon-btn danger"), "x", 13);
   del.type = "button";
   del.setAttribute("aria-label", "Delete subtask");
-  del.addEventListener("click", () => {
+  del.addEventListener("click", async () => {
+    if (task.subtasks && task.subtasks.length) {
+      const r = await confirmAction({
+        title: "Delete this task?",
+        message: "\u201C" + task.text + "\u201D and its " + task.subtasks.length + " subtask" + (task.subtasks.length === 1 ? "" : "s") + " will be permanently deleted.",
+        confirmText: "Delete task",
+      });
+      if (!r.result) return;
+    }
     const found = findTask(task.id);
     if (!found) return;
     maybeCancelFocus(task.id);
@@ -1943,8 +2040,23 @@ document.getElementById("taskModalClose").addEventListener("click", closeTaskMod
 document.getElementById("taskOverlay").addEventListener("click", (e) => {
   if (e.target.id === "taskOverlay") closeTaskModal();
 });
+/* standard shortcuts: Cmd/Ctrl+Z undo, Cmd/Ctrl+Shift+Z or Ctrl+Y redo.
+   Skipped while typing so native text-field undo keeps working. */
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape" && modalTaskId) closeTaskModal();
+  if (e.key === "Escape") {
+    if (modalTaskId) closeTaskModal();
+    else if (confirmResolver) confirmResolver(false);
+    return;
+  }
+  if (confirmResolver) return;
+  const t = e.target;
+  const typing = t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable);
+  if (typing) return;
+  const mod = e.metaKey || e.ctrlKey;
+  if (!mod) return;
+  const key = e.key.toLowerCase();
+  if (key === "z" && !e.shiftKey && !e.altKey) { e.preventDefault(); undo(); }
+  else if ((key === "z" && e.shiftKey) || (key === "y" && e.ctrlKey && !e.metaKey)) { e.preventDefault(); redo(); }
 });
 document.getElementById("taskModalForm").addEventListener("submit", (e) => {
   e.preventDefault();
@@ -1958,3 +2070,48 @@ document.getElementById("taskModalForm").addEventListener("submit", (e) => {
   save(); renderAll(); renderTaskModal();
   input.focus();
 });
+
+/* ============ confirm dialog (severe deletes) ============ */
+let confirmResolver = null;
+function confirmAction(opts) {
+  return new Promise((resolve) => {
+    const overlay = document.getElementById("confirmOverlay");
+    document.getElementById("confirmTitle").textContent = opts.title || "Are you sure?";
+    document.getElementById("confirmMsg").textContent = opts.message || "";
+    const yesBtn = document.getElementById("confirmYes");
+    yesBtn.textContent = opts.confirmText || "Delete";
+    const checkWrap = document.getElementById("confirmCheckWrap");
+    const check = document.getElementById("confirmCheck");
+    check.checked = false;
+    if (opts.checkboxLabel) {
+      checkWrap.style.display = "";
+      document.getElementById("confirmCheckLabel").textContent = opts.checkboxLabel;
+    } else {
+      checkWrap.style.display = "none";
+    }
+    const finish = (result) => {
+      confirmResolver = null;
+      overlay.classList.remove("open");
+      if (!modalTaskId) document.body.style.overflow = "";
+      document.getElementById("confirmNo").removeEventListener("click", onNo);
+      yesBtn.removeEventListener("click", onYes);
+      overlay.removeEventListener("click", onBackdrop);
+      resolve({ result, dontAsk: check.checked });
+    };
+    const onNo = () => finish(false);
+    const onYes = () => finish(true);
+    const onBackdrop = (e) => { if (e.target === overlay) finish(false); };
+    confirmResolver = (v) => finish(!!v);
+    document.getElementById("confirmNo").addEventListener("click", onNo);
+    yesBtn.addEventListener("click", onYes);
+    overlay.addEventListener("click", onBackdrop);
+    overlay.classList.add("open");
+    document.body.style.overflow = "hidden";
+    yesBtn.focus();
+  });
+}
+
+document.getElementById("undoBtn").addEventListener("click", undo);
+document.getElementById("redoBtn").addEventListener("click", redo);
+lastCommittedJson = stateSnapshotJson();
+updateUndoButtons();
