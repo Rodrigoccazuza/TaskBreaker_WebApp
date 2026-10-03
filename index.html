@@ -36,6 +36,10 @@
     </nav>
 
     <div class="sidebar-bottom">
+      <div class="undo-row">
+        <button type="button" class="icon-btn" id="undoBtn" title="Undo (Cmd/Ctrl+Z)" aria-label="Undo"><i class="bi bi-arrow-counterclockwise"></i></button>
+        <button type="button" class="icon-btn" id="redoBtn" title="Redo (Cmd/Ctrl+Shift+Z)" aria-label="Redo"><i class="bi bi-arrow-clockwise"></i></button>
+      </div>
       <label class="theme-toggle" title="Toggle light / dark mode">
         <input type="checkbox" id="themeToggle" />
         <span class="switch"><span class="knob"><i class="bi bi-sun"></i></span></span>
@@ -325,6 +329,22 @@
       <input type="text" id="taskModalInput" placeholder="Add a subtask…" maxlength="120" autocomplete="off" />
       <button type="submit" class="btn btn-primary btn-sm">Add</button>
     </form>
+  </div>
+</div>
+
+<!-- Confirm dialog -->
+<div class="overlay" id="confirmOverlay">
+  <div class="modal modal-sm" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle">
+    <h3 id="confirmTitle"></h3>
+    <p class="confirm-msg" id="confirmMsg"></p>
+    <label class="confirm-check" id="confirmCheckWrap">
+      <input type="checkbox" id="confirmCheck" />
+      <span id="confirmCheckLabel"></span>
+    </label>
+    <div class="confirm-actions">
+      <button type="button" class="btn btn-secondary" id="confirmNo">Cancel</button>
+      <button type="button" class="btn btn-danger" id="confirmYes">Delete</button>
+    </div>
   </div>
 </div>
 
