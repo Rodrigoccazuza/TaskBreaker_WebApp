@@ -441,10 +441,10 @@ function checkMedals() {
 /* ================= toast / voice ================= */
 
 let toastTimer = null;
-function toast(msg) {
+function toast(msg, kind) {
   const t = document.getElementById("toast");
   t.textContent = msg;
-  t.classList.add("show");
+  t.className = "toast show" + (kind ? " " + kind : "");
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => t.classList.remove("show"), 2600);
 }
@@ -463,7 +463,7 @@ function attachMic(btn, input) {
   btn.addEventListener("click", () => {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) {
-      toast("Voice input isn't supported in this browser");
+      toast("Voice input isn't supported in this browser", "warning");
       return;
     }
     try {
@@ -710,6 +710,7 @@ function taskNode(task, removeTask, afterChange, goalTitle) {
     const mini = el("div", "mini-progress");
     const fill = el("div", "mini-fill");
     fill.style.width = pct + "%";
+    if (pct >= 100) fill.classList.add("done");
     mini.appendChild(fill);
     miniRow.appendChild(mini);
     miniRow.appendChild(el("span", "mini-label", kd + "/" + kids.length + " subtasks"));
@@ -747,7 +748,7 @@ function showSubtaskForm(li, task) {
   input.placeholder = "Break it down further…";
   input.maxLength = 120;
   input.autocomplete = "off";
-  const add = el("button", "btn-primary", "+");
+  const add = el("button", "btn btn-primary", "+");
   add.type = "submit";
   add.setAttribute("aria-label", "Add subtask");
   form.append(input, add);
@@ -813,6 +814,7 @@ function goalCard(goal) {
   const bar = el("div", "progress-bar");
   const fill = el("div", "progress-fill");
   fill.style.width = pct + "%";
+  if (pct >= 100) fill.classList.add("done");
   bar.appendChild(fill);
   prog.appendChild(bar);
   prog.appendChild(el("span", "progress-text", leaves.done + "/" + leaves.total + " done"));
@@ -830,7 +832,7 @@ function goalCard(goal) {
       awardXP(50);
       const node = document.querySelector('[data-goal="' + goal.id + '"]');
       if (node) { node.classList.add("celebrate"); setTimeout(() => node.classList.remove("celebrate"), 600); }
-      toast("Goal complete: " + goal.title + " (+50 XP)");
+      toast("Goal complete: " + goal.title + " (+50 XP)", "success");
       speak("Goal complete. " + goal.title + ". Amazing work.");
       renderAll();
     }
@@ -844,7 +846,7 @@ function goalCard(goal) {
   const mic = setIcon(el("button", "mic-btn"), "mic", 16);
   mic.type = "button"; mic.title = "Dictate task"; mic.style.width = "46px"; mic.style.fontSize = "18px";
   attachMic(mic, input);
-  const add = el("button", "btn-primary", "+");
+  const add = el("button", "btn btn-primary", "+");
   add.type = "submit"; add.setAttribute("aria-label", "Add task");
   form.append(input, mic, add);
   form.addEventListener("submit", (e) => {
@@ -899,7 +901,7 @@ document.getElementById("addGoalBtn").addEventListener("click", () => {
   document.getElementById("newGoalTimeline").value = "";
   document.getElementById("newGoalDeadline").value = "";
   save(); renderAll();
-  toast("New goal added");
+  toast("New goal added", "success");
 });
 
 /* ================= weekly routines ================= */
@@ -980,7 +982,7 @@ document.getElementById("addRoutineBtn").addEventListener("click", () => {
   const input = document.getElementById("routineInput");
   const text = input.value.trim();
   if (!text) { input.focus(); return; }
-  if (!routineDaySel.size) { toast("Pick at least one day"); return; }
+  if (!routineDaySel.size) { toast("Pick at least one day", "warning"); return; }
   state.routines.push({ id: uid(), text, days: [...routineDaySel].sort(), done: {} });
   input.value = "";
   save(); renderRoutines();
@@ -1382,7 +1384,7 @@ function completeFocus() {
   renderAll();
   chime();
   speak("Time is up. Great focus session.");
-  toast("Time's up: " + (f ? f.taskText : "task") + " (+15 XP)");
+  toast("Time's up: " + (f ? f.taskText : "task") + " (+15 XP)", "success");
   try {
     if ("Notification" in window && Notification.permission === "granted") {
       new Notification("Timer up — " + (f ? f.taskText : "task"), {
@@ -1585,7 +1587,7 @@ document.getElementById("importFile").addEventListener("change", (e) => {
         items = rowsToItems(parseCSV(text));
       }
       addImports(items, f.name);
-    } catch (err) { toast("Couldn't read that file"); }
+    } catch (err) { toast("Couldn't read that file", "danger"); }
     e.target.value = "";
   };
   rd.readAsText(f);
@@ -1612,7 +1614,7 @@ function sheetCsvUrl(url) {
 document.getElementById("sheetImportBtn").addEventListener("click", async () => {
   const input = document.getElementById("sheetUrl");
   const raw = input.value.trim();
-  if (!raw) { toast("Paste a sheet or CSV link first"); return; }
+  if (!raw) { toast("Paste a sheet or CSV link first", "warning"); return; }
   toast("Fetching sheet…");
   try {
     const res = await fetch(sheetCsvUrl(raw));
@@ -1734,7 +1736,7 @@ function analyzePath() {
     sc.innerHTML = icon(cat.icon, 12) + " " + cat.name;
     card.appendChild(sc);
     if (!c.category) card.appendChild(el("span", "conf-tag", "best guess"));
-    const add = el("button", "suggest-add");
+    const add = el("button", "btn btn-tertiary btn-sm");
     add.innerHTML = icon("plus", 13) + " Add as quest";
     add.type = "button";
     add.addEventListener("click", () => {
@@ -1744,7 +1746,7 @@ function analyzePath() {
       g.tasks.push(normalizeTask({ text: item.title, deadline: item.date }));
       item.added = true;
       save(); renderAll();
-      toast("Quest added to " + cat.name + " inbox");
+      toast("Quest added to " + cat.name + " inbox", "success");
       analyzePath();
     });
     card.appendChild(add);
