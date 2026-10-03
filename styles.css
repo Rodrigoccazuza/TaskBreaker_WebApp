@@ -37,11 +37,50 @@ body[data-theme="dark"] {
   --small-inset: inset 3px 3px 6px var(--sh-dark), inset -3px -3px 6px var(--sh-light);
 }
 
+/* ---------- type + spacing tokens (theme-independent) ---------- */
+:root {
+  --font-display: "M PLUS Rounded 1c", "Manrope", system-ui, sans-serif;
+  --font-body: "Manrope", system-ui, sans-serif;
+
+  /* type scale — every step a multiple of 2 */
+  --fs-display: 48px;
+  --fs-h1: 32px;
+  --fs-h2: 24px;
+  --fs-h3: 20px;
+  --fs-body: 16px;
+  --fs-small: 14px;
+  --fs-caption: 12px;
+
+  /* line heights — 100% for huge titles, 150% for body/small text */
+  --lh-display: 1;
+  --lh-heading: 1.15;
+  --lh-body: 1.5;
+  --lh-small: 1.5;
+
+  /* letter spacing — room for letters to breathe */
+  --ls-display: -0.01em;
+  --ls-heading: -0.01em;
+  --ls-body: 0.01em;
+  --ls-label: 0.08em;
+
+  /* 8pt spacing rhythm */
+  --sp-1: 8px;
+  --sp-2: 16px;
+  --sp-3: 24px;
+  --sp-4: 32px;
+  --sp-5: 40px;
+  --sp-6: 48px;
+  --sp-8: 64px;
+
+  /* grid */
+  --content-max: 1060px;
+}
+
 /* ---------- base ---------- */
 html, body { height: 100%; }
 
 body {
-  font-family: "Inter", system-ui, sans-serif;
+  font-family: var(--font-body);
   color: var(--text);
   background: var(--bg);
   min-height: 100vh;
@@ -80,7 +119,7 @@ body {
 }
 
 .brand h1 {
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--font-display);
   font-size: 21px;
   letter-spacing: -0.01em;
 }
@@ -98,7 +137,7 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
-  font-family: "Inter", sans-serif;
+  font-family: var(--font-body);
   font-size: 15px;
   font-weight: 500;
   color: var(--text);
@@ -181,7 +220,7 @@ body {
 .page-head { margin-bottom: 22px; }
 
 .page-head h2 {
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--font-display);
   font-size: 32px;
   letter-spacing: -0.02em;
 }
@@ -189,7 +228,7 @@ body {
 .page-sub { color: var(--muted); margin-top: 4px; font-size: 14.5px; }
 
 .section-title {
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--font-display);
   font-size: 19px;
   margin: 26px 4px 14px;
 }
@@ -204,7 +243,7 @@ body {
 }
 
 .card h3 {
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--font-display);
   font-size: 18px;
   margin-bottom: 14px;
 }
@@ -219,7 +258,7 @@ body {
   border-left: 6px solid var(--danger);
 }
 
-.alert-card h4 { font-family: "Space Grotesk", sans-serif; font-size: 15px; margin-bottom: 8px; }
+.alert-card h4 { font-family: var(--font-display); font-size: 15px; margin-bottom: 8px; }
 .alert-card ul { list-style: none; }
 .alert-card li { font-size: 13.5px; padding: 4px 0; color: var(--text); }
 
@@ -278,10 +317,10 @@ body {
   justify-content: center;
 }
 
-.g-center strong { font-family: "Space Grotesk", sans-serif; font-size: 21px; }
+.g-center strong { font-family: var(--font-display); font-size: 21px; }
 .g-center span { font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); }
 
-.g-label { font-family: "Space Grotesk", sans-serif; font-weight: 600; font-size: 14.5px; margin-top: 12px; }
+.g-label { font-family: var(--font-display); font-weight: 600; font-size: 14.5px; margin-top: 12px; }
 .g-sub { font-size: 12px; color: var(--muted); margin-top: 2px; font-variant-numeric: tabular-nums; }
 
 /* ---------- goals ---------- */
@@ -292,7 +331,7 @@ body {
   margin: 26px 4px 14px;
 }
 
-.cat-head h3 { font-family: "Space Grotesk", sans-serif; font-size: 19px; }
+.cat-head h3 { font-family: var(--font-display); font-size: 19px; }
 .cat-head .cat-count { color: var(--muted); font-size: 13px; }
 
 .goal-grid {
@@ -318,7 +357,7 @@ body {
 }
 
 .goal-headings { flex: 1; min-width: 0; }
-.goal-title { font-family: "Space Grotesk", sans-serif; font-size: 17px; }
+.goal-title { font-family: var(--font-display); font-size: 17px; }
 
 .badge-row { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
 
@@ -500,7 +539,7 @@ body {
 
 /* ---------- inputs ---------- */
 input[type="text"], input[type="date"], input[type="time"], textarea, select {
-  font-family: "Inter", sans-serif;
+  font-family: var(--font-body);
   font-size: 14px;
   color: var(--text);
   background: var(--bg);
@@ -552,7 +591,7 @@ input[type="checkbox"]:not(.task-check):checked::after {
 
 /* ---------- buttons ---------- */
 .btn-primary {
-  font-family: "Inter", sans-serif;
+  font-family: var(--font-body);
   font-size: 14px;
   font-weight: 600;
   color: #fff;
@@ -617,7 +656,7 @@ input[type="checkbox"]:not(.task-check):checked::after {
 .routine-card { margin-bottom: 16px; }
 
 .routine-top { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
-.routine-top h4 { font-family: "Space Grotesk", sans-serif; font-size: 16px; flex: 1; }
+.routine-top h4 { font-family: var(--font-display); font-size: 16px; flex: 1; }
 .routine-top.done h4 { color: var(--muted); text-decoration: line-through; }
 
 .day-dots { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -629,7 +668,7 @@ input[type="checkbox"]:not(.task-check):checked::after {
   background: var(--bg);
   box-shadow: var(--small-shadow);
   color: var(--muted);
-  font-family: "Inter", sans-serif;
+  font-family: var(--font-body);
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
@@ -672,7 +711,7 @@ input[type="checkbox"]:not(.task-check):checked::after {
   width: 72px; height: 72px;
   border-radius: 50%;
   display: grid; place-items: center;
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--font-display);
   font-size: 30px;
   font-weight: 700;
   color: #fff;
@@ -682,7 +721,7 @@ input[type="checkbox"]:not(.task-check):checked::after {
 }
 
 .level-info { flex: 1; }
-.level-info h3 { font-family: "Space Grotesk", sans-serif; font-size: 20px; margin-bottom: 10px; }
+.level-info h3 { font-family: var(--font-display); font-size: 20px; margin-bottom: 10px; }
 
 .xp-bar {
   height: 14px;
@@ -703,7 +742,7 @@ input[type="checkbox"]:not(.task-check):checked::after {
 .xp-text { font-size: 12.5px; color: var(--muted); margin-top: 6px; font-variant-numeric: tabular-nums; }
 
 .streak-pill {
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--font-display);
   font-size: 20px;
   font-weight: 700;
   padding: 12px 18px;
@@ -746,7 +785,7 @@ input[type="checkbox"]:not(.task-check):checked::after {
   box-shadow: 4px 4px 10px var(--sh-dark), -4px -4px 10px var(--sh-light);
 }
 
-.medal h4 { font-family: "Space Grotesk", sans-serif; font-size: 14px; margin-bottom: 4px; }
+.medal h4 { font-family: var(--font-display); font-size: 14px; margin-bottom: 4px; }
 .medal p { font-size: 12px; color: var(--muted); }
 
 /* ---------- wishlist / notes ---------- */
@@ -783,7 +822,7 @@ input[type="checkbox"]:not(.task-check):checked::after {
   position: relative;
 }
 
-.note-card h4 { font-family: "Space Grotesk", sans-serif; font-size: 15.5px; margin-bottom: 6px; padding-right: 24px; }
+.note-card h4 { font-family: var(--font-display); font-size: 15.5px; margin-bottom: 6px; padding-right: 24px; }
 .note-card p { font-size: 13.5px; color: var(--muted); white-space: pre-wrap; }
 .note-card .task-del { position: absolute; top: 14px; right: 14px; }
 
@@ -823,7 +862,7 @@ input[type="checkbox"]:not(.task-check):checked::after {
   width: 84px; height: 84px;
   border-radius: 50%;
   display: grid; place-items: center;
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--font-display);
   font-size: 38px;
   font-weight: 700;
   color: var(--accent);
@@ -832,7 +871,7 @@ input[type="checkbox"]:not(.task-check):checked::after {
   flex-shrink: 0;
 }
 
-.profile-top h3 { font-family: "Space Grotesk", sans-serif; font-size: 24px; }
+.profile-top h3 { font-family: var(--font-display); font-size: 24px; }
 .profile-role { color: var(--muted); font-size: 14px; margin-top: 3px; }
 .profile-loc { font-size: 13.5px; margin-top: 5px; }
 
@@ -861,7 +900,7 @@ input[type="checkbox"]:not(.task-check):checked::after {
   box-shadow: var(--card-shadow);
 }
 
-.stat strong { font-family: "Space Grotesk", sans-serif; font-size: 26px; display: block; }
+.stat strong { font-family: var(--font-display); font-size: 26px; display: block; }
 .stat span { font-size: 11.5px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
 
 .settings-list { display: flex; flex-direction: column; }
@@ -975,7 +1014,7 @@ input[type="checkbox"]:not(.task-check):checked::after {
 
 /* --- timer picker popover --- */
 .timer-pop { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; padding: 10px; border-radius: 12px; background: var(--bg); box-shadow: var(--small-inset); }
-.timer-chip { border: none; cursor: pointer; font-family: "Inter", sans-serif; font-size: 13px; font-weight: 600; color: var(--text); background: var(--bg); border-radius: 10px; padding: 8px 14px; box-shadow: var(--small-shadow); }
+.timer-chip { border: none; cursor: pointer; font-family: var(--font-body); font-size: 13px; font-weight: 600; color: var(--text); background: var(--bg); border-radius: 10px; padding: 8px 14px; box-shadow: var(--small-shadow); }
 .timer-chip:hover { color: var(--accent); }
 .timer-custom { display: flex; gap: 6px; align-items: center; }
 .timer-custom input { width: 64px; border: none; border-radius: 10px; padding: 8px 10px; font-size: 13px; background: var(--bg); color: var(--text); box-shadow: var(--small-inset); }
@@ -1010,10 +1049,10 @@ input[type="checkbox"]:not(.task-check):checked::after {
 .cat-chip { font-size: 11px; font-weight: 700; border-radius: 999px; padding: 3px 10px; background: var(--bg); box-shadow: var(--small-shadow); }
 .xp-chip { font-size: 11px; font-weight: 700; color: var(--gold-deep); }
 .path-actions { display: flex; gap: 8px; flex-shrink: 0; }
-.path-lock { border: none; cursor: pointer; font-size: 12px; font-weight: 700; font-family: "Inter", sans-serif; color: #fff; background: linear-gradient(145deg, var(--accent), var(--accent-deep)); border-radius: 10px; padding: 8px 14px; }
+.path-lock { border: none; cursor: pointer; font-size: 12px; font-weight: 700; font-family: var(--font-body); color: #fff; background: linear-gradient(145deg, var(--accent), var(--accent-deep)); border-radius: 10px; padding: 8px 14px; }
 .suggest-card { display: flex; gap: 12px; align-items: center; background: var(--bg); border-radius: 16px; padding: 14px 16px; box-shadow: var(--small-shadow); margin-bottom: 10px; flex-wrap: wrap; }
 .suggest-card .task-text { flex: 1; min-width: 180px; font-size: 14px; }
-.suggest-add { border: none; cursor: pointer; font-family: "Inter", sans-serif; font-size: 12px; font-weight: 700; color: var(--accent-deep); background: var(--bg); border-radius: 10px; padding: 8px 14px; box-shadow: var(--small-shadow); }
+.suggest-add { border: none; cursor: pointer; font-family: var(--font-body); font-size: 12px; font-weight: 700; color: var(--accent-deep); background: var(--bg); border-radius: 10px; padding: 8px 14px; box-shadow: var(--small-shadow); }
 .suggest-add:active { box-shadow: var(--small-inset); }
 .conf-tag { font-size: 11px; color: var(--muted); }
 
@@ -1032,3 +1071,151 @@ button .fi, .nav-icon .fi { pointer-events: none; }
 .medal-icon .fi { width: 30px; height: 30px; }
 h3 .fi { color: var(--accent); }
 .task-lock-btn .fi, .task-cal-btn .fi, .task-del .fi, .task-sub-btn .fi { width: 14px; height: 14px; }
+
+/* ============ TYPOGRAPHY SYSTEM — M PLUS Rounded 1c + Manrope ============
+   Scale is multiples of 2 · 100% line-height on huge titles,
+   150% on body/small text · generous letter-spacing throughout. */
+
+/* --- base --- */
+body {
+  font-family: var(--font-body);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  letter-spacing: var(--ls-body);
+  font-weight: 500;
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--font-display);
+  line-height: var(--lh-heading);
+  letter-spacing: var(--ls-heading);
+  text-wrap: balance;
+}
+
+p, li, span, label, input, textarea, select, button {
+  letter-spacing: var(--ls-body);
+}
+
+/* --- hierarchy --- */
+.brand h1 { font-size: var(--fs-h3); font-weight: 800; line-height: var(--lh-heading); letter-spacing: var(--ls-heading); }
+.tagline { font-size: var(--fs-caption); letter-spacing: var(--ls-label); font-weight: 700; text-transform: uppercase; }
+
+.page-head { margin-bottom: var(--sp-3); text-align: left; }
+.page-head h2 { font-size: var(--fs-h1); font-weight: 800; line-height: 1.1; letter-spacing: var(--ls-display); }
+.page-sub { font-size: var(--fs-small); line-height: var(--lh-small); margin-top: var(--sp-1); }
+
+.section-title { font-size: var(--fs-h3); font-weight: 700; margin: var(--sp-4) 0 var(--sp-2); text-align: left; }
+.card h3 { font-size: var(--fs-h3); font-weight: 700; line-height: var(--lh-heading); margin-bottom: var(--sp-2); text-align: left; }
+
+/* --- dashboard --- */
+.alert-card h4 { font-size: var(--fs-body); font-weight: 700; }
+.alert-card li { font-size: var(--fs-small); line-height: var(--lh-small); }
+.g-center strong { font-size: var(--fs-h2); font-weight: 800; line-height: var(--lh-display); font-variant-numeric: tabular-nums; }
+.g-center span { font-size: var(--fs-caption); letter-spacing: var(--ls-label); font-weight: 700; }
+.g-label { font-size: var(--fs-body); font-weight: 700; }
+.g-sub { font-size: var(--fs-caption); line-height: var(--lh-small); }
+.cat-head h3 { font-size: var(--fs-h3); font-weight: 700; text-align: left; }
+.cat-head .cat-count { font-size: var(--fs-small); }
+.goal-icon { font-size: var(--fs-h2); }
+.goal-title { font-size: 18px; font-weight: 700; line-height: 1.3; text-align: left; }
+.badge { font-size: var(--fs-caption); letter-spacing: 0.06em; font-weight: 600; line-height: var(--lh-small); }
+.progress-text { font-size: var(--fs-caption); }
+.task-text, .task-list li { font-size: var(--fs-small); line-height: var(--lh-small); }
+.mini-label { font-size: var(--fs-caption); }
+.subtask-form input { font-size: var(--fs-small); }
+.lock-time { font-size: var(--fs-caption); }
+.empty-note { font-size: var(--fs-small); line-height: var(--lh-small); text-align: center; }
+
+/* --- nav / sidebar --- */
+.nav-btn { font-size: var(--fs-body); font-weight: 600; text-align: left; }
+.theme-label { font-size: var(--fs-small); }
+.today { font-size: var(--fs-caption); }
+
+/* --- rewards --- */
+.level-badge { font-size: var(--fs-h1); font-weight: 800; line-height: var(--lh-display); }
+.level-info h3 { font-size: var(--fs-h3); font-weight: 700; }
+.streak-pill { font-size: var(--fs-h3); font-weight: 800; }
+.medal-icon { font-size: 30px; }
+.medal h4 { font-size: var(--fs-body); font-weight: 700; }
+.medal p { font-size: var(--fs-small); line-height: var(--lh-small); }
+
+/* --- weekly --- */
+.routine-top h4 { font-size: var(--fs-body); font-weight: 700; }
+.day-dot { font-size: var(--fs-caption); font-weight: 700; }
+
+/* --- notes / wishlist / digest --- */
+.note-card h4 { font-size: var(--fs-body); font-weight: 700; line-height: 1.35; }
+.note-card p, .check-list li span { font-size: var(--fs-small); line-height: var(--lh-small); }
+.digest-note { font-size: var(--fs-small); line-height: var(--lh-small); }
+.fine-print { font-size: var(--fs-caption); line-height: var(--lh-small); letter-spacing: 0.02em; }
+
+/* --- profile --- */
+.avatar { font-size: 40px; font-weight: 800; font-family: var(--font-display); }
+.profile-top h3 { font-size: var(--fs-h2); font-weight: 800; line-height: 1.1; }
+.profile-role, .profile-loc { font-size: var(--fs-small); line-height: var(--lh-small); }
+.stat strong { font-size: var(--fs-h2); font-weight: 800; line-height: var(--lh-display); font-variant-numeric: tabular-nums; }
+.stat span { font-size: var(--fs-caption); letter-spacing: var(--ls-label); font-weight: 700; text-transform: uppercase; }
+.setting-row { font-size: var(--fs-small); line-height: var(--lh-small); }
+.setting-row small { font-size: var(--fs-caption); }
+
+/* --- v5 modules --- */
+.timer-chip { font-size: var(--fs-small); font-weight: 700; }
+.timer-custom input { font-size: var(--fs-small); }
+.focus-info strong { font-size: var(--fs-small); font-weight: 700; }
+.focus-sub { font-size: var(--fs-caption); }
+.focus-time { font-size: var(--fs-h2); font-weight: 800; line-height: var(--lh-display); }
+.src-badge { font-size: var(--fs-caption); letter-spacing: var(--ls-label); }
+.import-date { font-size: var(--fs-caption); }
+.path-body strong { font-size: var(--fs-small); font-weight: 700; line-height: 1.4; }
+.path-meta { font-size: var(--fs-caption); }
+.cat-chip, .xp-chip { font-size: var(--fs-caption); font-weight: 700; }
+.path-step::before { font-size: var(--fs-body); font-weight: 800; }
+.path-lock { font-size: var(--fs-small); font-weight: 700; }
+.suggest-card .task-text { font-size: var(--fs-small); }
+.suggest-add { font-size: var(--fs-small); font-weight: 700; }
+.conf-tag { font-size: var(--fs-caption); }
+.count-pill { font-size: var(--fs-caption); }
+
+/* --- buttons / inputs --- */
+.btn-primary { font-size: var(--fs-small); font-weight: 700; letter-spacing: 0.02em; }
+input[type="text"], input[type="date"], input[type="time"], textarea, select {
+  font-size: var(--fs-small); line-height: var(--lh-small);
+}
+.add-task .btn-primary { font-size: 18px; }
+
+/* --- alignment system ---
+   Left edge: page heads, section titles, card headers, goal titles.
+   Centered: gauges, medals, stats, empty states, toasts, focus bar. */
+.page-head, .section-title, .card, .cat-head, .goal-top { text-align: left; }
+.wheels, .gauge, .medal, .level-card, .profile-stats, .empty-note,
+.g-center, .toast, .focus-bar { text-align: center; }
+.section-title, .page-head { margin-inline: 0; }
+
+/* --- grid rhythm (8pt) --- */
+.main { padding: var(--sp-4) var(--sp-4) var(--sp-8); max-width: var(--content-max); }
+.card { padding: var(--sp-3); margin-bottom: var(--sp-2); }
+.page-head { margin-bottom: var(--sp-3); }
+
+/* --- responsive scale: tablet --- */
+@media (max-width: 900px) {
+  :root {
+    --fs-display: 40px;
+    --fs-h1: 28px;
+    --fs-h2: 22px;
+    --fs-h3: 18px;
+  }
+}
+
+/* --- responsive scale: mobile --- */
+@media (max-width: 640px) {
+  :root {
+    --fs-display: 32px;
+    --fs-h1: 24px;
+    --fs-h2: 20px;
+    --fs-h3: 16px;
+  }
+  .main { padding: var(--sp-3) var(--sp-2) var(--sp-6); }
+  .card { padding: var(--sp-2); border-radius: 20px; }
+  .page-head { margin-bottom: var(--sp-2); }
+  .section-title { margin: var(--sp-3) 0 var(--sp-2); }
+}
