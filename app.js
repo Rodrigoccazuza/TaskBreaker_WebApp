@@ -44,6 +44,35 @@ function el(tag, cls, text) {
   return n;
 }
 
+/* ============ project color coding ============
+   Every goal carries a color tag: null = Auto (follows status:
+   green done / red overdue / amber due soon / orange otherwise),
+   or a manual palette pick to tell projects apart at a glance. */
+const GOAL_COLORS = {
+  orange: "#eb6c37",
+  blue: "#4a90d9",
+  green: "#3d9e58",
+  purple: "#8b7cf0",
+  pink: "#e5638f",
+  teal: "#2aa198",
+  red: "#df6b6b",
+  amber: "#f0b429",
+};
+function goalAutoColor(goal) {
+  const pct = goalProgress(goal);
+  if (pct >= 100 && goal.tasks.length) return "var(--success)";
+  const info = goal.deadline ? deadlineInfo(goal.deadline) : null;
+  if (info) {
+    if (info.cls === "due-over") return "var(--danger)";
+    if (info.cls === "due-soon") return "var(--warning)";
+  }
+  return "var(--accent)";
+}
+function goalColorValue(goal) {
+  if (goal.color && GOAL_COLORS[goal.color]) return GOAL_COLORS[goal.color];
+  return goalAutoColor(goal);
+}
+
 /* bootstrap line icons (CDN font): <i> glyphs inherit text color */
 const BI_MAP = {
  "zap": "lightning-charge",
@@ -206,6 +235,7 @@ function normalizeGoal(g) {
     deadline: g.deadline || null,
     category: catOf(g.category).id,
     tasks: (g.tasks || []).map(normalizeTask),
+    color: g.color && GOAL_COLORS[g.color] ? g.color : null,
   };
 }
 
@@ -872,6 +902,7 @@ function showSubtaskForm(li, task) {
 function goalCard(goal) {
   const card = el("article", "card goal-card");
   card.dataset.goal = goal.id;
+  card.style.setProperty("--goal-color", goalColorValue(goal));
 
   const top = el("div", "goal-top");
   const gic = el("span", "goal-icon");
@@ -902,6 +933,12 @@ function goalCard(goal) {
   calBtn.title = "Goal deadline & calendar";
   calBtn.setAttribute("aria-label", "Set goal deadline");
   calBtn.addEventListener("click", () => deadlineEditor(card, goal, goal.title));
+  const colorBtn = el("button", "icon-btn tool color-dot-btn");
+  colorBtn.innerHTML = '<span class="color-dot"></span>';
+  colorBtn.type = "button";
+  colorBtn.title = "Color code this project";
+  colorBtn.setAttribute("aria-label", "Color code this project");
+  colorBtn.addEventListener("click", (e) => { e.stopPropagation(); toggleColorPicker(colorBtn, goal); });
   const del = setIcon(el("button", "icon-btn"), "x", 14);
   del.title = "Delete goal";
   del.setAttribute("aria-label", "Delete goal");
@@ -920,7 +957,7 @@ function goalCard(goal) {
     save(); renderAll();
     toast("Goal deleted \u2014 " + undoHint(), "warning");
   });
-  top.append(calBtn, del);
+  top.append(calBtn, colorBtn, del);
   card.appendChild(top);
 
   const pct = goalProgress(goal);
@@ -2115,3 +2152,47 @@ document.getElementById("undoBtn").addEventListener("click", undo);
 document.getElementById("redoBtn").addEventListener("click", redo);
 lastCommittedJson = stateSnapshotJson();
 updateUndoButtons();
+
+/* color picker popover */
+let colorPopEl = null;
+function closeColorPicker() {
+  if (colorPopEl) { colorPopEl.remove(); colorPopEl = null; }
+  document.removeEventListener("click", closeColorPicker);
+}
+function toggleColorPicker(anchorBtn, goal) {
+  const wasOpen = !!colorPopEl;
+  closeColorPicker();
+  if (wasOpen) return;
+  const pop = el("div", "color-pop");
+  pop.setAttribute("role", "menu");
+  const current = goal.color || "auto";
+  ["auto", ...Object.keys(GOAL_COLORS)].forEach((k) => {
+    const b = el("button", "swatch" + (current === k ? " sel" : ""));
+    b.type = "button";
+    if (k === "auto") {
+      b.classList.add("auto");
+      b.title = "Auto \u2014 color follows status (done / overdue / due soon)";
+      b.setAttribute("aria-label", "Automatic color");
+      b.innerHTML = '<i class="bi bi-palette"></i>';
+    } else {
+      b.style.background = GOAL_COLORS[k];
+      b.title = k.charAt(0).toUpperCase() + k.slice(1);
+      b.setAttribute("aria-label", "Color " + k);
+    }
+    b.addEventListener("click", (e) => {
+      e.stopPropagation();
+      goal.color = k === "auto" ? null : k;
+      closeColorPicker();
+      save(); renderAll();
+      toast(k === "auto" ? "Color set to Auto" : "Project color updated");
+    });
+    pop.appendChild(b);
+  });
+  document.body.appendChild(pop);
+  const r = anchorBtn.getBoundingClientRect();
+  pop.style.top = (r.bottom + window.scrollY + 8) + "px";
+  pop.style.left = Math.max(8, Math.min(r.left + window.scrollX - 80, window.innerWidth - 220)) + "px";
+  colorPopEl = pop;
+  setTimeout(() => document.addEventListener("click", closeColorPicker), 0);
+  pop.addEventListener("click", (e) => e.stopPropagation());
+}
