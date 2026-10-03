@@ -1408,3 +1408,24 @@ li.task-collapsed > .subtask-wrap { display: none; }
 .swatch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .swatch.sel { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent); }
 .swatch.auto { background: conic-gradient(#eb6c37, #f0b429, #3d9e58, #4a90d9, #8b7cf0, #eb6c37); }
+
+/* ============ drag to reorder ============ */
+.drag-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 28px;
+  flex: 0 0 auto;
+  color: var(--muted);
+  opacity: 0.5;
+  cursor: grab;
+  border-radius: 6px;
+  touch-action: none;
+  transition: opacity 0.15s ease, color 0.15s ease;
+}
+.task-row:hover .drag-handle { opacity: 1; color: var(--accent); }
+.drag-handle:active { cursor: grabbing; }
+.task-list li.drag-src { opacity: 0.35; }
+body.dragging, body.dragging * { user-select: none !important; -webkit-user-select: none !important; }
+body.dragging { cursor: grabbing; }
