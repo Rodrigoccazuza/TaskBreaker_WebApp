@@ -73,7 +73,7 @@
           </select>
           <input type="text" id="newGoalTimeline" placeholder="Timeline (e.g. 2 months)" maxlength="30" autocomplete="off" />
           <input type="date" id="newGoalDeadline" aria-label="Deadline (optional)" title="Deadline (optional)" />
-          <button type="button" class="btn-primary" id="addGoalBtn">Add goal</button>
+          <button type="button" class="btn btn-primary" id="addGoalBtn">Add goal</button>
         </div>
       </article>
     </section>
@@ -92,7 +92,7 @@
         <div class="routine-form">
           <input type="text" id="routineInput" placeholder="e.g. Morning run…" maxlength="80" autocomplete="off" />
           <div class="day-picker" id="routineDays" aria-label="Days"></div>
-          <button type="button" class="btn-primary" id="addRoutineBtn">Add</button>
+          <button type="button" class="btn btn-primary" id="addRoutineBtn">Add</button>
         </div>
       </article>
     </section>
@@ -131,7 +131,7 @@
       <article class="card">
         <form class="add-row" id="wishlistForm">
           <input type="text" id="wishlistInput" placeholder="Add something to your wishlist…" maxlength="120" autocomplete="off" />
-          <button type="submit" class="btn-primary">Add</button>
+          <button type="submit" class="btn btn-primary">Add</button>
         </form>
         <ul class="check-list" id="wishlistList"></ul>
       </article>
@@ -152,7 +152,7 @@
             <textarea id="noteBody" rows="3" placeholder="Write your note…" maxlength="1000"></textarea>
             <button type="button" class="mic-btn" id="noteMic" title="Dictate note"><i class="bi bi-mic"></i></button>
           </div>
-          <button type="button" class="btn-primary" id="addNoteBtn">Pin note</button>
+          <button type="button" class="btn btn-primary" id="addNoteBtn">Pin note</button>
         </div>
       </article>
       <div class="notes-grid" id="notesGrid"></div>
@@ -189,14 +189,14 @@
             <label><input type="checkbox" id="digestRoutines" checked /> Weekly routines</label>
             <label><input type="checkbox" id="digestWishlist" checked /> Wishlist</label>
           </div>
-          <button type="button" class="btn-primary" id="saveDigestBtn">Save settings</button>
+          <button type="button" class="btn btn-primary" id="saveDigestBtn">Save settings</button>
         </div>
       </article>
       <article class="card">
         <h3>Send it now</h3>
         <p class="digest-note">This opens a pre-written email with your current digest. One tap to send.</p>
         <div class="digest-preview" id="digestPreview"></div>
-        <button type="button" class="btn-primary" id="sendDigestBtn"><i class="bi bi-envelope"></i> Email my digest</button>
+        <button type="button" class="btn btn-primary" id="sendDigestBtn"><i class="bi bi-envelope"></i> Email my digest</button>
         <p class="fine-print">Fully automatic sending (no taps needed) requires a small server component, which this static app doesn't have yet. The settings above are saved and ready for it.</p>
       </article>
     </section>
@@ -217,7 +217,7 @@
         <h3><i class="bi bi-file-earmark"></i> Upload a file</h3>
         <p class="fine-print">CSV or JSON. From Google Sheets: File → Download → CSV. From Notion: ••• → Export → CSV.</p>
         <div class="add-row">
-          <button type="button" class="btn-primary" id="importFileBtn">Choose file…</button>
+          <button type="button" class="btn btn-secondary" id="importFileBtn">Choose file…</button>
           <input type="file" id="importFile" accept=".csv,.json,.txt" hidden />
         </div>
       </article>
@@ -226,7 +226,7 @@
         <p class="fine-print">One item per line. Add a date like <code>2026-10-15</code> or <code>due: Oct 15</code> anywhere in the line.</p>
         <div class="note-form">
           <textarea id="pasteImport" rows="4" placeholder="Buy birthday gift&#10;Finish portfolio case study due: 2026-10-20&#10;Call dentist" maxlength="5000"></textarea>
-          <button type="button" class="btn-primary" id="pasteImportBtn">Import pasted text</button>
+          <button type="button" class="btn btn-primary" id="pasteImportBtn">Import pasted text</button>
         </div>
       </article>
       <article class="card">
@@ -234,7 +234,7 @@
         <p class="fine-print">In Google Sheets: File → Share → Publish to web (CSV), then paste the link here. Or paste any public CSV link.</p>
         <div class="add-row">
           <input type="url" id="sheetUrl" placeholder="https://docs.google.com/spreadsheets/… or .csv link" autocomplete="off" />
-          <button type="button" class="btn-primary" id="sheetImportBtn">Fetch</button>
+          <button type="button" class="btn btn-primary" id="sheetImportBtn">Fetch</button>
         </div>
       </article>
       <article class="card">
@@ -256,7 +256,7 @@
           <h3><i class="bi bi-compass"></i> Chart my path</h3>
           <p class="fine-print" style="margin-bottom:0">Analyzes open tasks and imported items, assigns each a category, and builds today's quest path — ordered by urgency and impact. Runs locally; nothing leaves your device.</p>
         </div>
-        <button type="button" class="btn-primary" id="analyzeBtn">Analyze</button>
+        <button type="button" class="btn btn-primary" id="analyzeBtn">Analyze</button>
       </article>
       <div id="pathResults" hidden>
         <h3 class="section-title"><i class="bi bi-map"></i> Today's quest path</h3>
