@@ -441,6 +441,9 @@ function checkMedals() {
 /* ================= toast / voice ================= */
 
 let toastTimer = null;
+
+/* tasks whose subtask trees are expanded inline (default: collapsed) */
+const expandedTasks = new Set();
 function toast(msg, kind) {
   const t = document.getElementById("toast");
   t.textContent = msg;
@@ -659,7 +662,12 @@ function taskNode(task, removeTask, afterChange, goalTitle) {
     if (afterChange) afterChange();
   });
 
-  const span = el("span", "task-text", task.text);
+  const span = el("span", "task-text task-open", task.text);
+  span.title = "Open task details";
+  span.setAttribute("role", "button");
+  span.setAttribute("tabindex", "0");
+  span.addEventListener("click", () => openTaskModal(task.id));
+  span.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openTaskModal(task.id); } });
 
   const info = deadlineInfo(task.deadline);
   if (info) {
@@ -685,7 +693,11 @@ function taskNode(task, removeTask, afterChange, goalTitle) {
   subBtn.type = "button";
   subBtn.title = "Break into subtasks";
   subBtn.setAttribute("aria-label", "Add subtask");
-  subBtn.addEventListener("click", () => showSubtaskForm(li, task));
+  subBtn.addEventListener("click", () => {
+    expandedTasks.add(task.id);
+    li.classList.remove("task-collapsed");
+    showSubtaskForm(li, task);
+  });
 
   const lockBtn = setIcon(el("button", "task-lock-btn"), "clock", 14);
   lockBtn.type = "button";
@@ -698,10 +710,23 @@ function taskNode(task, removeTask, afterChange, goalTitle) {
   x.setAttribute("aria-label", "Delete task");
   x.addEventListener("click", () => removeTask(task));
 
-  row.append(calBtn, lockBtn, subBtn, x);
+  const tools = el("div", "task-tools");
+  tools.append(calBtn, lockBtn, subBtn, x);
+  row.append(tools);
   li.appendChild(row);
 
   if (task.subtasks && task.subtasks.length) {
+    const exp = setIcon(el("button", "task-expand"), "chevron-down", 14);
+    exp.type = "button";
+    exp.title = "Show/hide subtasks";
+    exp.setAttribute("aria-label", "Show or hide subtasks");
+    exp.addEventListener("click", () => {
+      if (expandedTasks.has(task.id)) expandedTasks.delete(task.id);
+      else expandedTasks.add(task.id);
+      li.classList.toggle("task-collapsed", !expandedTasks.has(task.id));
+    });
+    row.prepend(exp);
+    if (!expandedTasks.has(task.id)) li.classList.add("task-collapsed");
     const kids = task.subtasks;
     const kd = kids.filter(taskDone).length;
     const pct = Math.round((kd / kids.length) * 100);
@@ -757,6 +782,7 @@ function showSubtaskForm(li, task) {
     const text = input.value.trim();
     if (!text) return;
     task.subtasks.push({ id: uid(), text, done: false, deadline: null, subtasks: [] });
+    expandedTasks.add(task.id);
     save(); renderAll();
   });
   wrap.insertBefore(form, ul);
@@ -1776,3 +1802,159 @@ document.getElementById("focusStopBtn").addEventListener("click", () => stopFocu
   }
   renderFocusBar();
 })();
+
+/* ============ task detail overlay ============ */
+let modalTaskId = null;
+
+function findInTree(arr, id) {
+  for (let i = 0; i < arr.length; i++) {
+    if (arr[i].id === id) return { task: arr[i], parent: arr, index: i };
+    if (arr[i].subtasks && arr[i].subtasks.length) {
+      const r = findInTree(arr[i].subtasks, id);
+      if (r) return r;
+    }
+  }
+  return null;
+}
+function findTask(id) {
+  for (const g of state.goals) {
+    const r = findInTree(g.tasks, id);
+    if (r) return { task: r.task, parent: r.parent, index: r.index, goal: g };
+  }
+  return null;
+}
+
+function openTaskModal(id) {
+  if (!findTask(id)) return;
+  modalTaskId = id;
+  renderTaskModal();
+  document.getElementById("taskOverlay").classList.add("open");
+  document.body.style.overflow = "hidden";
+}
+function closeTaskModal() {
+  modalTaskId = null;
+  document.getElementById("taskOverlay").classList.remove("open");
+  document.body.style.overflow = "";
+}
+
+function detailNode(task) {
+  const li = el("li", "detail-item");
+  const row = el("div", "detail-row");
+  const check = el("input", "task-check");
+  check.type = "checkbox";
+  check.checked = taskDone(task);
+  check.setAttribute("aria-label", task.text);
+  check.addEventListener("change", () => {
+    toggleTask(task);
+    save(); renderAll(); renderTaskModal();
+  });
+  const span = el("span", "task-text", task.text);
+  if (taskDone(task)) li.classList.add("done");
+  row.append(check, span);
+
+  const addBtn = setIcon(el("button", "icon-btn"), "plus", 13);
+  addBtn.type = "button";
+  addBtn.title = "Add subtask";
+  addBtn.setAttribute("aria-label", "Add subtask to " + task.text);
+  addBtn.addEventListener("click", () => {
+    if (row.nextElementSibling && row.nextElementSibling.classList.contains("detail-form")) {
+      row.nextElementSibling.querySelector("input").focus();
+      return;
+    }
+    const form = el("form", "detail-form");
+    const input = el("input");
+    input.type = "text";
+    input.placeholder = "Break it down further…";
+    input.maxLength = 120;
+    input.autocomplete = "off";
+    const go = setIcon(el("button", "btn btn-primary btn-sm"), "plus", 13);
+    go.type = "submit";
+    go.setAttribute("aria-label", "Add subtask");
+    form.append(input, go);
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const text = input.value.trim();
+      if (!text) return;
+      task.subtasks.push({ id: uid(), text, done: false, deadline: null, subtasks: [] });
+      save(); renderAll(); renderTaskModal();
+    });
+    row.after(form);
+    input.focus();
+  });
+
+  const del = setIcon(el("button", "icon-btn danger"), "x", 13);
+  del.type = "button";
+  del.setAttribute("aria-label", "Delete subtask");
+  del.addEventListener("click", () => {
+    const found = findTask(task.id);
+    if (!found) return;
+    maybeCancelFocus(task.id);
+    found.parent.splice(found.index, 1);
+    save(); renderAll(); renderTaskModal();
+  });
+  row.append(addBtn, del);
+  li.appendChild(row);
+
+  if (task.subtasks && task.subtasks.length) {
+    const ul = el("ul", "detail-sub");
+    task.subtasks.forEach((st) => ul.appendChild(detailNode(st)));
+    li.appendChild(ul);
+  }
+  return li;
+}
+
+function renderTaskModal() {
+  const found = findTask(modalTaskId);
+  if (!found) { closeTaskModal(); return; }
+  const { task, goal } = found;
+  document.getElementById("taskModalTitle").textContent = task.text;
+
+  const meta = document.getElementById("taskModalMeta");
+  meta.innerHTML = "";
+  const info = deadlineInfo(task.deadline);
+  if (info) meta.appendChild(el("span", "badge " + info.cls, info.text));
+  meta.appendChild(el("span", "badge cat", goal.title));
+
+  const prog = document.getElementById("taskModalProgress");
+  prog.innerHTML = "";
+  const kids = task.subtasks || [];
+  if (kids.length) {
+    const kd = kids.filter(taskDone).length;
+    const pct = Math.round((kd / kids.length) * 100);
+    const bar = el("div", "progress-bar");
+    const fill = el("div", "progress-fill");
+    fill.style.width = pct + "%";
+    if (pct >= 100) fill.classList.add("done");
+    bar.appendChild(fill);
+    prog.appendChild(bar);
+    prog.appendChild(el("span", "progress-text", kd + "/" + kids.length + " done"));
+  }
+
+  const body = document.getElementById("taskModalBody");
+  body.innerHTML = "";
+  if (kids.length) {
+    kids.forEach((st) => body.appendChild(detailNode(st)));
+  } else {
+    body.appendChild(el("p", "empty-note", "No subtasks yet — break it down below."));
+  }
+}
+
+document.getElementById("taskModalClose").addEventListener("click", closeTaskModal);
+document.getElementById("taskOverlay").addEventListener("click", (e) => {
+  if (e.target.id === "taskOverlay") closeTaskModal();
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && modalTaskId) closeTaskModal();
+});
+document.getElementById("taskModalForm").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const found = findTask(modalTaskId);
+  if (!found) return;
+  const input = document.getElementById("taskModalInput");
+  const text = input.value.trim();
+  if (!text) return;
+  found.task.subtasks.push({ id: uid(), text, done: false, deadline: null, subtasks: [] });
+  input.value = "";
+  save(); renderAll(); renderTaskModal();
+  input.focus();
+});
