@@ -2243,9 +2243,9 @@ function startTaskDrag(e, li, ul, items) {
   };
 
   const cleanup = () => {
-    handle.removeEventListener("pointermove", onMove);
-    handle.removeEventListener("pointerup", onUp);
-    handle.removeEventListener("pointercancel", onCancel);
+    document.removeEventListener("pointermove", onMove);
+    document.removeEventListener("pointerup", onUp);
+    document.removeEventListener("pointercancel", onCancel);
     document.removeEventListener("keydown", onKey, true);
     document.body.classList.remove("dragging");
     li.classList.remove("drag-src");
@@ -2269,8 +2269,10 @@ function startTaskDrag(e, li, ul, items) {
   const onCancel = () => { cleanup(); renderAll(); };
   const onKey = (ev) => { if (ev.key === "Escape") { cleanup(); renderAll(); } };
 
-  handle.addEventListener("pointermove", onMove);
-  handle.addEventListener("pointerup", onUp);
-  handle.addEventListener("pointercancel", onCancel);
+  /* Listen on document (not just the 22px handle) so the drag survives
+     the pointer leaving the handle, with or without pointer capture. */
+  document.addEventListener("pointermove", onMove);
+  document.addEventListener("pointerup", onUp);
+  document.addEventListener("pointercancel", onCancel);
   document.addEventListener("keydown", onKey, true);
 }
