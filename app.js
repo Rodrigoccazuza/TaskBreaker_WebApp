@@ -643,7 +643,7 @@ function taskNode(task, removeTask, afterChange, goalTitle) {
   calBtn.setAttribute("aria-label", "Set deadline");
   calBtn.addEventListener("click", () => deadlineEditor(li, task, task.text));
 
-  const subBtn = el("button", "task-sub-btn", "+");
+  const subBtn = setIcon(el("button", "task-sub-btn"), "plus", 14);
   subBtn.type = "button";
   subBtn.title = "Break into subtasks";
   subBtn.setAttribute("aria-label", "Add subtask");
