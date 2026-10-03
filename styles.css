@@ -1372,3 +1372,39 @@ li.task-collapsed > .subtask-wrap { display: none; }
 /* ---------- undo / redo ---------- */
 .undo-row { display: flex; gap: 8px; margin: 4px 0 12px; }
 .icon-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+/* ============ project color coding ============ */
+.goal-card { position: relative; }
+.goal-card::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 28px; right: 28px; height: 4px;
+  border-radius: 0 0 6px 6px;
+  background: var(--goal-color, var(--accent));
+  transition: background 0.25s ease;
+}
+.goal-card .goal-icon { color: var(--goal-color, var(--accent)); }
+.color-dot-btn .color-dot {
+  width: 14px; height: 14px; border-radius: 50%;
+  background: var(--goal-color, var(--accent));
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.1);
+  pointer-events: none;
+}
+.color-pop {
+  position: absolute; z-index: 95;
+  display: flex; gap: 8px; flex-wrap: wrap; max-width: 216px;
+  padding: 12px; border-radius: 16px;
+  background: var(--bg); box-shadow: var(--card-shadow);
+}
+.swatch {
+  width: 32px; height: 32px; border-radius: 50%;
+  border: none; cursor: pointer; padding: 0;
+  display: grid; place-items: center;
+  box-shadow: var(--small-shadow);
+  color: var(--muted); font-size: 14px;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.swatch:hover { transform: scale(1.12); }
+.swatch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.swatch.sel { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent); }
+.swatch.auto { background: conic-gradient(#eb6c37, #f0b429, #3d9e58, #4a90d9, #8b7cf0, #eb6c37); }
