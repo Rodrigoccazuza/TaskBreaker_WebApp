@@ -865,7 +865,9 @@ function renderGoals() {
   CATEGORIES.forEach((cat) => {
     const section = el("div", "cat-section");
     const head = el("div", "cat-head");
-    head.appendChild(el("h3", null, icon(cat.icon) + " " + cat.name));
+    const h3 = el("h3");
+    h3.innerHTML = icon(cat.icon) + " " + cat.name;
+    head.appendChild(h3);
     const goals = state.goals.filter((g) => g.category === cat.id);
     head.appendChild(el("span", "cat-count", goals.length + (goals.length === 1 ? " goal" : " goals")));
     section.appendChild(head);
