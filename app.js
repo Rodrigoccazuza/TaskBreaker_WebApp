@@ -746,10 +746,15 @@ function deadlineEditor(li, task, label) {
 
 function taskNode(task, removeTask, afterChange, goalTitle) {
   const li = el("li");
+  li.dataset.taskId = task.id;
   const done = taskDone(task);
   if (done) li.classList.add("done");
 
   const row = el("div", "task-row");
+  const grip = setIcon(el("span", "drag-handle"), "grip-vertical", 14);
+  grip.title = "Drag to reorder";
+  grip.setAttribute("aria-label", "Drag to reorder tasks");
+  row.appendChild(grip);
   const check = el("input", "task-check");
   check.type = "checkbox";
   check.checked = done;
@@ -858,6 +863,7 @@ function taskNode(task, removeTask, afterChange, goalTitle) {
       task.subtasks = task.subtasks.filter((s) => s.id !== child.id);
       save(); renderAll();
     }, afterChange, goalTitle)));
+    makeSortable(ul, task.subtasks);
     wrap.appendChild(ul);
     li.appendChild(wrap);
   }
@@ -990,6 +996,7 @@ function goalCard(goal) {
     }
   };
   goal.tasks.forEach((task) => list.appendChild(taskNode(task, removeTop, celebrate, goal.title)));
+  makeSortable(list, goal.tasks);
   card.appendChild(list);
 
   const form = el("form", "add-task");
@@ -2195,4 +2202,75 @@ function toggleColorPicker(anchorBtn, goal) {
   colorPopEl = pop;
   setTimeout(() => document.addEventListener("click", closeColorPicker), 0);
   pop.addEventListener("click", (e) => e.stopPropagation());
+}
+
+/* ============ drag to reorder tasks (pointer-based: mouse + touch) ============ */
+function makeSortable(ul, items) {
+  if (!ul || ul.dataset.sortable) return;
+  ul.dataset.sortable = "1";
+  ul.querySelectorAll(":scope > li").forEach((li) => {
+    const handle = li.querySelector(":scope > .task-row > .drag-handle");
+    if (handle) handle.addEventListener("pointerdown", (e) => startTaskDrag(e, li, ul, items));
+  });
+}
+
+function startTaskDrag(e, li, ul, items) {
+  if (e.button !== undefined && e.button > 0) return;
+  e.preventDefault();
+  const handle = e.currentTarget;
+  try { handle.setPointerCapture(e.pointerId); } catch (_) {}
+  const startY = e.clientY;
+  let dragging = false;
+  document.body.classList.add("dragging");
+
+  const onMove = (ev) => {
+    if (!dragging) {
+      if (Math.abs(ev.clientY - startY) < 6) return;
+      dragging = true;
+      li.classList.add("drag-src");
+    }
+    if (ev.cancelable) ev.preventDefault();
+    const edge = 70;
+    if (ev.clientY < edge) window.scrollBy(0, -14);
+    else if (ev.clientY > window.innerHeight - edge) window.scrollBy(0, 14);
+    let over = document.elementFromPoint(ev.clientX, ev.clientY);
+    over = over ? over.closest("li") : null;
+    if (!over || over === li || over.parentElement !== ul) return;
+    const r = over.getBoundingClientRect();
+    const after = (ev.clientY - r.top) > r.height / 2;
+    const ref = after ? over.nextSibling : over;
+    if (ref !== li) ul.insertBefore(li, ref);
+  };
+
+  const cleanup = () => {
+    handle.removeEventListener("pointermove", onMove);
+    handle.removeEventListener("pointerup", onUp);
+    handle.removeEventListener("pointercancel", onCancel);
+    document.removeEventListener("keydown", onKey, true);
+    document.body.classList.remove("dragging");
+    li.classList.remove("drag-src");
+  };
+  const commit = () => {
+    const order = Array.from(ul.querySelectorAll(":scope > li"));
+    const newOrder = order
+      .map((node) => items.find((t) => t.id === node.dataset.taskId))
+      .filter(Boolean);
+    const changed = newOrder.length === items.length &&
+      newOrder.some((t, i) => t.id !== items[i].id);
+    if (changed) {
+      items.length = 0;
+      items.push(...newOrder);
+      save();
+      toast("Task moved");
+    }
+    renderAll();
+  };
+  const onUp = () => { cleanup(); commit(); };
+  const onCancel = () => { cleanup(); renderAll(); };
+  const onKey = (ev) => { if (ev.key === "Escape") { cleanup(); renderAll(); } };
+
+  handle.addEventListener("pointermove", onMove);
+  handle.addEventListener("pointerup", onUp);
+  handle.addEventListener("pointercancel", onCancel);
+  document.addEventListener("keydown", onKey, true);
 }
