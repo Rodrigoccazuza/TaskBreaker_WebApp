@@ -2291,7 +2291,10 @@ function startTaskDrag(e, li, ul, items) {
    Optional layer on top of the local-first model. Everything still
    works offline in localStorage; when signed in, save() also pushes
    to Supabase (debounced), and login pulls the cloud copy down.
-   Gamification (xp, medals, streaks) and settings stay on-device. */
+   Rewards + settings (xp, medals, activity, streak, theme, digest,
+   voice, notify, focusSessions, ui) sync through the user_profile
+   table. The live focus timer (focus) and the import staging area
+   (imports) are ephemeral and stay on-device by design. */
 
 let sbClient = null;
 let cloudUser = null;
@@ -2387,6 +2390,46 @@ function cloudTaskRows() {
   });
 }
 
+/* ---------- user_profile: rewards + settings, one row per user ---------- */
+
+function cloudProfileRow() {
+  const a = state.activity && typeof state.activity === "object" ? state.activity : {};
+  const recent = Object.keys(a).sort().slice(-120); /* dayKeys are YYYY-MM-DD: keep it small */
+  const activity = {};
+  recent.forEach((k) => { activity[k] = a[k]; });
+  return {
+    user_id: cloudUser.id,
+    xp: +state.xp || 0,
+    medals: Array.isArray(state.medals) ? state.medals : [],
+    activity,
+    streak: +state.streak || 0,
+    theme: state.theme === "dark" ? "dark" : "light",
+    digest: state.digest && typeof state.digest === "object" ? state.digest : {},
+    voice: { celebrations: !(state.voice && state.voice.celebrations === false) },
+    notify: { deadlines: !!(state.notify && state.notify.deadlines) },
+    focus_sessions: +state.focusSessions || 0,
+    ui: { skipGoalDeleteConfirm: !!(state.ui && state.ui.skipGoalDeleteConfirm) },
+    updated_at: new Date().toISOString(),
+  };
+}
+
+function applyCloudProfile(row) {
+  if (!row) return;
+  const b = blankState();
+  state.xp = +row.xp || 0;
+  state.medals = Array.isArray(row.medals)
+    ? row.medals.filter((m) => MEDALS.some((d) => d.id === m))
+    : [];
+  state.activity = row.activity && typeof row.activity === "object" ? row.activity : {};
+  state.streak = +row.streak || 0;
+  state.theme = row.theme === "dark" ? "dark" : "light";
+  state.digest = { ...b.digest, ...(row.digest && typeof row.digest === "object" ? row.digest : {}) };
+  state.voice = { celebrations: !(row.voice && row.voice.celebrations === false) };
+  state.notify = { deadlines: !!(row.notify && row.notify.deadlines) };
+  state.focusSessions = +row.focus_sessions || 0;
+  state.ui = { skipGoalDeleteConfirm: !!(row.ui && row.ui.skipGoalDeleteConfirm) };
+}
+
 function nestTasks(goalId, taskRows) {
   const byId = {};
   const roots = [];
@@ -2468,6 +2511,9 @@ async function pushToCloud() {
     await deleteMissing(client, "wishlist", w.map((x) => x.id));
     await deleteMissing(client, "notes", n.map((x) => x.id));
     await deleteMissing(client, "routines", r.map((x) => x.id));
+    /* single-row upsert: no shadow set needed, one row per user */
+    const { error: pErr } = await client.from("user_profile").upsert(cloudProfileRow(), { onConflict: "user_id" });
+    if (pErr) throw pErr;
     refreshShadows();
     setSyncStatus("synced");
   } catch (e) {
@@ -2483,20 +2529,31 @@ async function syncFromCloud() {
   cloudPushSuspended = true;
   setSyncStatus("syncing");
   try {
-    const names = ["goals", "tasks", "wishlist", "notes", "routines"];
+    const names = ["goals", "tasks", "wishlist", "notes", "routines", "user_profile"];
     const res = await Promise.all(names.map((t) => client.from(t).select("*")));
     const failed = res.find((r) => r.error);
     if (failed) throw failed.error;
     const data = {};
     names.forEach((t, i) => { data[t] = res[i].data || []; });
-    const cloudHas = names.some((t) => data[t].length > 0);
+    const dataTables = ["goals", "tasks", "wishlist", "notes", "routines"];
+    const cloudHasData = dataTables.some((t) => data[t].length > 0);
+    const cloudProfile = (data.user_profile || [])[0] || null;
     const localHas = state.goals.length > 0 || state.wishlist.length > 0 ||
       state.notes.length > 0 || state.routines.length > 0;
-    if (!cloudHas && localHas) {
+    if (!cloudHasData && localHas) {
       await migrateLocalToCloud();
       toast("Your local tasks are now saved to your cloud account", "success");
-    } else if (cloudHas) {
+    } else if (cloudHasData) {
       applyCloudState(data);
+    } else if (cloudProfile) {
+      /* fresh device: no task data anywhere, but a profile row exists — pull rewards/settings */
+      suppressSnapshot = true;
+      applyCloudProfile(cloudProfile);
+      state.streak = computeStreak();
+      save();
+      suppressSnapshot = false;
+      applyTheme();
+      renderAll();
     }
     refreshShadows();
     setSyncStatus("synced");
@@ -2533,11 +2590,7 @@ async function migrateLocalToCloud() {
 }
 
 function applyCloudState(data) {
-  const keep = {
-    theme: state.theme, xp: state.xp, medals: state.medals, activity: state.activity,
-    streak: state.streak, digest: state.digest, voice: state.voice, notify: state.notify,
-    imports: state.imports, focusSessions: state.focusSessions, ui: state.ui, focus: state.focus,
-  };
+  const keep = { imports: state.imports, focus: state.focus };
   state.goals = (data.goals || []).map((g) => ({
     id: g.id, icon: "target", title: g.title || "Untitled goal", timeline: g.timeline || "",
     deadline: g.deadline || null, category: catOf(g.category).id,
@@ -2548,10 +2601,14 @@ function applyCloudState(data) {
   state.notes = (data.notes || []).map((x) => ({ id: x.id, title: x.title || "", body: x.body || "" }));
   state.routines = (data.routines || []).map((r) =>
     normalizeRoutine({ id: r.id, text: r.text, days: r.days, done: r.done }));
+  const profile = (data.user_profile || [])[0] || null;
+  if (profile) applyCloudProfile(profile);
+  state.streak = computeStreak(); /* streak is derived from activity, like bootApp */
   Object.assign(state, keep);
   suppressSnapshot = true;
   save();
   suppressSnapshot = false;
+  applyTheme();
   renderAll();
 }
 
