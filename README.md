@@ -60,6 +60,39 @@ python3 -m http.server 8000
 - Streaks and weekly summaries
 - Cloud sync / accounts
 
+- **☁️ Cloud sync + accounts (v6):** optional Supabase backend. Create an
+  account or sign in from the login screen (email + password, with email
+  confirmation) and your goals, tasks, wishlist, notes, and routines sync
+  across devices. Everything still works offline first in `localStorage`;
+  a status dot in the sidebar shows synced / syncing / offline. There is
+  also a "Continue without an account (offline)" path that keeps the app
+  fully local. XP, medals, streaks, and settings stay on-device by design.
+- **📱 Installable (PWA):** manifest + service worker with an offline app
+  shell, so you can Add to Home Screen on iPhone and launch it like an app.
+
+## Cloud sync setup
+
+The app works fully offline out of the box. To turn on cloud sync:
+
+1. Create a free project at [supabase.com/dashboard](https://supabase.com/dashboard).
+2. In the Supabase dashboard, open the **SQL editor** and run the whole
+   `supabase-migration.sql` file from this repo. It creates the `goals`,
+   `tasks`, `wishlist`, `notes`, and `routines` tables with row-level
+   security so each user only ever sees their own rows.
+3. Go to **Project Settings → API** in the dashboard and copy:
+   - **Project URL** → paste as `url` in `supabase-config.js`
+   - **anon / publishable key** → paste as `anonKey` in `supabase-config.js`
+   
+   Use the **anon key only**. Never put the `service_role` key in this
+   file or anywhere in client-side code — it bypasses all database
+   security rules.
+4. Deploy as usual (e.g. push to `main` for GitHub Pages).
+
+Email confirmation is **on by default**: after creating an account the user
+clicks the link in their inbox, then signs in. To turn it off, go to
+Dashboard → Authentication → Providers → Email and disable
+"Confirm email".
+
 ## v5 — Lock-in timer, Connections, Pathfinder (Oct 2026)
 
 - **🔒 Lock-in focus timer:** every task has a timer button. Pick 15/25/45/60 minutes or a custom
