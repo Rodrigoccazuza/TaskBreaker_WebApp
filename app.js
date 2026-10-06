@@ -30,6 +30,10 @@ const MEDALS = [
 /* ================= utils ================= */
 
 function uid() {
+  /* UUIDs for all new records so cloud upserts are natural.
+     Older local records keep their legacy string ids until their
+     first cloud migration, which remaps them to fresh UUIDs. */
+  if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
 
@@ -348,6 +352,7 @@ function save() {
     queueMicrotask(flushBurst);
   }
   lastCommittedJson = snap;
+  scheduleCloudPush();
 }
 function restoreSnapshot(json) {
   const keepFocus = state.focus;
@@ -1414,27 +1419,32 @@ function renderAll() {
   renderFocusBar();
 }
 
-attachMic(document.getElementById("noteMic"), document.getElementById("noteBody"));
+let appBooted = false;
+function bootApp() {
+  if (appBooted) return;
+  appBooted = true;
+  attachMic(document.getElementById("noteMic"), document.getElementById("noteBody"));
 
-/* wishlist mic */
-(function () {
-  const form = document.getElementById("wishlistForm");
-  const input = document.getElementById("wishlistInput");
-  const mic = setIcon(el("button", "mic-btn"), "mic", 16);
-  mic.type = "button";
-  mic.title = "Dictate wish";
-  mic.style.width = "52px";
-  attachMic(mic, input);
-  form.insertBefore(mic, form.querySelector('button[type="submit"]'));
-})();
+  /* wishlist mic */
+  (function () {
+    const form = document.getElementById("wishlistForm");
+    const input = document.getElementById("wishlistInput");
+    const mic = setIcon(el("button", "mic-btn"), "mic", 16);
+    mic.type = "button";
+    mic.title = "Dictate wish";
+    mic.style.width = "52px";
+    attachMic(mic, input);
+    form.insertBefore(mic, form.querySelector('button[type="submit"]'));
+  })();
 
-applyTheme();
-loadDigestForm();
-state.streak = computeStreak();
-checkMedals();
-save();
-renderAll();
-fireDeadlineAlerts();
+  applyTheme();
+  loadDigestForm();
+  state.streak = computeStreak();
+  checkMedals();
+  save();
+  renderAll();
+  fireDeadlineAlerts();
+}
 
 /* ================= v5: normalize helpers for new state ================= */
 
@@ -2276,3 +2286,497 @@ function startTaskDrag(e, li, ul, items) {
   document.addEventListener("pointercancel", onCancel);
   document.addEventListener("keydown", onKey, true);
 }
+
+/* ================= cloud sync + auth (Supabase) =================
+   Optional layer on top of the local-first model. Everything still
+   works offline in localStorage; when signed in, save() also pushes
+   to Supabase (debounced), and login pulls the cloud copy down.
+   Gamification (xp, medals, streaks) and settings stay on-device. */
+
+let sbClient = null;
+let cloudUser = null;
+let cloudPushSuspended = false;
+let pushTimer = null;
+const lastSyncedIds = { goals: new Set(), tasks: new Set(), wishlist: new Set(), notes: new Set(), routines: new Set() };
+
+function cloudConfigured() {
+  const c = window.TB_SUPABASE || {};
+  const ok = c.url && c.anonKey && c.url.indexOf("PASTE_YOUR") === -1 && c.anonKey.indexOf("PASTE_YOUR") === -1;
+  return !!ok && typeof supabase !== "undefined" && !!supabase.createClient;
+}
+
+function sb() {
+  if (!sbClient && cloudConfigured()) {
+    const c = window.TB_SUPABASE;
+    sbClient = supabase.createClient(c.url, c.anonKey);
+  }
+  return sbClient;
+}
+
+/* ---------- sync status + user chip ---------- */
+
+function setSyncStatus(s) {
+  const dot = document.getElementById("syncDot");
+  if (!dot) return;
+  dot.className = "sync-dot " + s;
+  dot.title = s === "synced" ? "All changes saved to the cloud"
+    : s === "syncing" ? "Syncing…"
+    : "Offline — changes are saved on this device";
+}
+
+function updateUserChip() {
+  const emailEl = document.getElementById("userEmail");
+  const logoutBtn = document.getElementById("logoutBtn");
+  if (!emailEl || !logoutBtn) return;
+  if (cloudUser && cloudUser.email) {
+    emailEl.textContent = cloudUser.email;
+    logoutBtn.hidden = false;
+  } else {
+    emailEl.textContent = "Local only";
+    logoutBtn.hidden = true;
+  }
+}
+
+/* ---------- flatten / nest the goal -> task tree ---------- */
+
+function flattenTaskTree(goal) {
+  const rows = [];
+  (function walk(list, parentId, depth) {
+    (list || []).forEach((t, i) => {
+      rows.push({
+        id: t.id, goal_id: goal.id, parent_id: parentId,
+        text: t.text || "", done: !!t.done, deadline: t.deadline || null,
+        position: i, _depth: depth,
+      });
+      if (t.subtasks && t.subtasks.length) walk(t.subtasks, t.id, depth + 1);
+    });
+  })(goal.tasks, null, 0);
+  return rows;
+}
+
+function cloudGoalRows() {
+  return state.goals.map((g) => ({
+    id: g.id, user_id: cloudUser.id, title: g.title,
+    timeline: g.timeline || null, deadline: g.deadline || null,
+    category: g.category, color: g.color || null,
+  }));
+}
+
+function cloudTaskRows() {
+  const rows = [];
+  state.goals.forEach((g) => {
+    flattenTaskTree(g).forEach((r) => rows.push({
+      id: r.id, user_id: cloudUser.id, goal_id: r.goal_id, parent_id: r.parent_id,
+      text: r.text, done: r.done, deadline: r.deadline, position: r.position, _depth: r._depth,
+    }));
+  });
+  rows.sort((a, b) => a._depth - b._depth); /* parents before children for the FK */
+  return rows.map((r) => {
+    const { _depth, ...rest } = r;
+    return rest;
+  });
+}
+
+function nestTasks(goalId, taskRows) {
+  const byId = {};
+  const roots = [];
+  taskRows.forEach((r) => {
+    if (r.goal_id !== goalId) return;
+    byId[r.id] = {
+      id: r.id, text: r.text || "", done: !!r.done, deadline: r.deadline || null,
+      subtasks: [], _parent: r.parent_id, _pos: r.position || 0,
+    };
+  });
+  Object.keys(byId).forEach((id) => {
+    const t = byId[id];
+    if (t._parent && byId[t._parent]) byId[t._parent].subtasks.push(t);
+    else roots.push(t);
+  });
+  (function sortTree(list) {
+    list.sort((a, b) => a._pos - b._pos);
+    list.forEach((t) => { delete t._pos; delete t._parent; sortTree(t.subtasks); });
+  })(roots);
+  return roots;
+}
+
+function refreshShadows() {
+  lastSyncedIds.goals = new Set(state.goals.map((g) => g.id));
+  lastSyncedIds.tasks = new Set(cloudTaskRows().map((t) => t.id));
+  lastSyncedIds.wishlist = new Set(state.wishlist.map((x) => x.id));
+  lastSyncedIds.notes = new Set(state.notes.map((x) => x.id));
+  lastSyncedIds.routines = new Set(state.routines.map((x) => x.id));
+}
+
+/* ---------- push (called debounced from save()) ---------- */
+
+function scheduleCloudPush() {
+  if (!cloudUser || !sb() || cloudPushSuspended || !appBooted) return;
+  clearTimeout(pushTimer);
+  pushTimer = setTimeout(pushToCloud, 1500);
+}
+
+async function deleteMissing(client, table, currentIds) {
+  const gone = Array.from(lastSyncedIds[table]).filter((id) => currentIds.indexOf(id) === -1);
+  if (!gone.length) return;
+  const { error } = await client.from(table).delete().in("id", gone);
+  if (error) throw error;
+}
+
+async function pushToCloud() {
+  const client = sb();
+  if (!client || !cloudUser) return;
+  setSyncStatus("syncing");
+  try {
+    const u = cloudUser.id;
+    const g = cloudGoalRows();
+    if (g.length) {
+      const { error } = await client.from("goals").upsert(g);
+      if (error) throw error;
+    }
+    const t = cloudTaskRows();
+    if (t.length) {
+      const { error } = await client.from("tasks").upsert(t);
+      if (error) throw error;
+    }
+    const w = state.wishlist.map((x) => ({ id: x.id, user_id: u, text: x.text, done: !!x.done }));
+    if (w.length) {
+      const { error } = await client.from("wishlist").upsert(w);
+      if (error) throw error;
+    }
+    const n = state.notes.map((x) => ({ id: x.id, user_id: u, title: x.title || null, body: x.body || "", pinned: false }));
+    if (n.length) {
+      const { error } = await client.from("notes").upsert(n);
+      if (error) throw error;
+    }
+    const r = state.routines.map((x) => ({ id: x.id, user_id: u, text: x.text, days: x.days, done: x.done || {} }));
+    if (r.length) {
+      const { error } = await client.from("routines").upsert(r);
+      if (error) throw error;
+    }
+    await deleteMissing(client, "goals", g.map((x) => x.id));
+    await deleteMissing(client, "tasks", t.map((x) => x.id));
+    await deleteMissing(client, "wishlist", w.map((x) => x.id));
+    await deleteMissing(client, "notes", n.map((x) => x.id));
+    await deleteMissing(client, "routines", r.map((x) => x.id));
+    refreshShadows();
+    setSyncStatus("synced");
+  } catch (e) {
+    setSyncStatus("offline"); /* localStorage stays authoritative; retry on next save */
+  }
+}
+
+/* ---------- pull + one-time migration (on login) ---------- */
+
+async function syncFromCloud() {
+  const client = sb();
+  if (!client || !cloudUser) return;
+  cloudPushSuspended = true;
+  setSyncStatus("syncing");
+  try {
+    const names = ["goals", "tasks", "wishlist", "notes", "routines"];
+    const res = await Promise.all(names.map((t) => client.from(t).select("*")));
+    const failed = res.find((r) => r.error);
+    if (failed) throw failed.error;
+    const data = {};
+    names.forEach((t, i) => { data[t] = res[i].data || []; });
+    const cloudHas = names.some((t) => data[t].length > 0);
+    const localHas = state.goals.length > 0 || state.wishlist.length > 0 ||
+      state.notes.length > 0 || state.routines.length > 0;
+    if (!cloudHas && localHas) {
+      await migrateLocalToCloud();
+      toast("Your local tasks are now saved to your cloud account", "success");
+    } else if (cloudHas) {
+      applyCloudState(data);
+    }
+    refreshShadows();
+    setSyncStatus("synced");
+  } catch (e) {
+    setSyncStatus("offline");
+  } finally {
+    cloudPushSuspended = false;
+  }
+}
+
+async function migrateLocalToCloud() {
+  /* Remap every legacy string id to a fresh UUID so the cloud PKs are canonical. */
+  const map = new Map();
+  const nid = (old) => {
+    if (!map.has(old)) map.set(old, crypto.randomUUID());
+    return map.get(old);
+  };
+  state.goals.forEach((g) => {
+    g.id = nid(g.id);
+    (function walk(list) {
+      (list || []).forEach((t) => { t.id = nid(t.id); walk(t.subtasks); });
+    })(g.tasks);
+  });
+  state.wishlist.forEach((x) => { x.id = nid(x.id); });
+  state.notes.forEach((x) => { x.id = nid(x.id); });
+  state.routines.forEach((x) => { x.id = nid(x.id); });
+  if (state.focus && state.focus.taskId && map.has(state.focus.taskId)) {
+    state.focus.taskId = map.get(state.focus.taskId);
+  }
+  suppressSnapshot = true;
+  save();
+  suppressSnapshot = false;
+  await pushToCloud(); /* shadows are empty: pure upserts */
+}
+
+function applyCloudState(data) {
+  const keep = {
+    theme: state.theme, xp: state.xp, medals: state.medals, activity: state.activity,
+    streak: state.streak, digest: state.digest, voice: state.voice, notify: state.notify,
+    imports: state.imports, focusSessions: state.focusSessions, ui: state.ui, focus: state.focus,
+  };
+  state.goals = (data.goals || []).map((g) => ({
+    id: g.id, icon: "target", title: g.title || "Untitled goal", timeline: g.timeline || "",
+    deadline: g.deadline || null, category: catOf(g.category).id,
+    color: g.color && GOAL_COLORS[g.color] ? g.color : null,
+    tasks: nestTasks(g.id, data.tasks || []),
+  }));
+  state.wishlist = (data.wishlist || []).map((x) => ({ id: x.id, text: x.text || "", done: !!x.done }));
+  state.notes = (data.notes || []).map((x) => ({ id: x.id, title: x.title || "", body: x.body || "" }));
+  state.routines = (data.routines || []).map((r) =>
+    normalizeRoutine({ id: r.id, text: r.text, days: r.days, done: r.done }));
+  Object.assign(state, keep);
+  suppressSnapshot = true;
+  save();
+  suppressSnapshot = false;
+  renderAll();
+}
+
+/* ================= auth UI ================= */
+
+let authMode = "signin";
+const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function setAuthMode(mode) {
+  authMode = mode;
+  document.querySelectorAll(".auth-tab").forEach((b) => {
+    const on = b.dataset.mode === mode;
+    b.classList.toggle("active", on);
+    b.setAttribute("aria-selected", on ? "true" : "false");
+  });
+  document.getElementById("authSubmit").textContent = mode === "signup" ? "Create account" : "Sign in";
+  document.getElementById("authPassword").setAttribute("autocomplete", mode === "signup" ? "new-password" : "current-password");
+  clearAuthError();
+}
+
+function setHint(inputEl, hintEl, msg, ok) {
+  hintEl.textContent = msg;
+  hintEl.classList.toggle("ok", !!ok && !!msg);
+  inputEl.classList.toggle("invalid", !!msg && !ok);
+}
+
+function validateAuthEmail() {
+  const input = document.getElementById("authEmail");
+  const hint = document.getElementById("authEmailHint");
+  const v = input.value.trim();
+  if (!v) { setHint(input, hint, "", false); return false; }
+  if (!emailRe.test(v)) { setHint(input, hint, "Enter a valid email address.", false); return false; }
+  setHint(input, hint, "Looks good.", true);
+  return true;
+}
+
+function validateAuthPassword() {
+  const input = document.getElementById("authPassword");
+  const hint = document.getElementById("authPasswordHint");
+  const v = input.value;
+  if (!v) { setHint(input, hint, "", false); return false; }
+  if (v.length < 8) { setHint(input, hint, "Use at least 8 characters.", false); return false; }
+  setHint(input, hint, "", false);
+  return true;
+}
+
+function pwScore(pw) {
+  let s = 0;
+  if (pw.length >= 8) s++;
+  if (pw.length >= 12) s++;
+  if (/[a-z]/.test(pw) && /[A-Z]/.test(pw)) s++;
+  if (/\d/.test(pw)) s++;
+  if (/[^A-Za-z0-9]/.test(pw)) s++;
+  return s;
+}
+
+function updatePwStrength() {
+  const v = document.getElementById("authPassword").value;
+  const box = document.getElementById("pwStrength");
+  if (!v) { box.hidden = true; return; }
+  box.hidden = false;
+  const s = pwScore(v);
+  const bar = document.getElementById("pwBar");
+  const label = document.getElementById("pwLabel");
+  bar.style.width = Math.min(100, (s / 5) * 100) + "%";
+  const lvl = s <= 2 ? ["Weak", "#df6b6b"] : s === 3 ? ["Fair", "#e8a83c"] : ["Strong", "#4cc06e"];
+  label.textContent = lvl[0];
+  bar.style.background = lvl[1];
+}
+
+function showAuthError(msg) {
+  const p = document.getElementById("authFormError");
+  p.textContent = msg;
+  p.hidden = false;
+}
+
+function clearAuthError() {
+  const p = document.getElementById("authFormError");
+  p.textContent = "";
+  p.hidden = true;
+}
+
+function friendlyAuthError(msg) {
+  const m = String(msg || "").toLowerCase();
+  if (m.indexOf("invalid login credentials") !== -1) {
+    return "That email and password did not match. Double-check and try again.";
+  }
+  if (m.indexOf("user already registered") !== -1 || m.indexOf("already been registered") !== -1) {
+    return "This email already has an account. Try signing in instead.";
+  }
+  if (m.indexOf("email not confirmed") !== -1) {
+    return "Please confirm your email first. Check your inbox for the confirmation link.";
+  }
+  if (m.indexOf("password should be at least") !== -1 || m.indexOf("password is too short") !== -1) {
+    return "Password needs to be at least 8 characters.";
+  }
+  if (m.indexOf("network") !== -1 || m.indexOf("fetch") !== -1) {
+    return "Could not reach the server. Check your connection and try again.";
+  }
+  return msg || "Something went wrong. Please try again.";
+}
+
+function setAuthLoading(on) {
+  const btn = document.getElementById("authSubmit");
+  btn.classList.toggle("loading", on);
+  btn.disabled = on;
+  btn.textContent = on ? "Please wait…" : (authMode === "signup" ? "Create account" : "Sign in");
+}
+
+function showConfirmState(email) {
+  document.getElementById("authForm").hidden = true;
+  document.querySelector(".auth-tabs").style.display = "none";
+  document.getElementById("authConfirmEmail").textContent = email;
+  document.getElementById("authConfirm").hidden = false;
+}
+
+function resetAuthForm() {
+  document.getElementById("authForm").hidden = false;
+  document.querySelector(".auth-tabs").style.display = "";
+  document.getElementById("authConfirm").hidden = true;
+  document.getElementById("authEmail").value = "";
+  document.getElementById("authPassword").value = "";
+  document.getElementById("pwStrength").hidden = true;
+  setHint(document.getElementById("authEmail"), document.getElementById("authEmailHint"), "", false);
+  setHint(document.getElementById("authPassword"), document.getElementById("authPasswordHint"), "", false);
+  clearAuthError();
+}
+
+function wireAuthUI() {
+  document.querySelectorAll(".auth-tab").forEach((b) => {
+    b.addEventListener("click", () => setAuthMode(b.dataset.mode));
+  });
+  document.getElementById("authEmail").addEventListener("input", validateAuthEmail);
+  document.getElementById("authPassword").addEventListener("input", () => {
+    validateAuthPassword();
+    updatePwStrength();
+  });
+  document.getElementById("authForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const emailOk = validateAuthEmail();
+    const pwOk = validateAuthPassword();
+    if (!emailOk || !pwOk) return;
+    if (!cloudConfigured()) {
+      showAuthError("Cloud sync is not set up yet. Paste your Supabase URL and anon key into supabase-config.js, or continue offline for now.");
+      return;
+    }
+    const email = document.getElementById("authEmail").value.trim();
+    const password = document.getElementById("authPassword").value;
+    clearAuthError();
+    setAuthLoading(true);
+    try {
+      if (authMode === "signup") {
+        const { data, error } = await sb().auth.signUp({ email, password });
+        if (error) throw error;
+        if (data.session) enterApp(data.session.user);
+        else showConfirmState(email);
+      } else {
+        const { data, error } = await sb().auth.signInWithPassword({ email, password });
+        if (error) throw error;
+        enterApp(data.user);
+      }
+    } catch (err) {
+      showAuthError(friendlyAuthError(err && err.message));
+    } finally {
+      setAuthLoading(false);
+    }
+  });
+  document.getElementById("authBackBtn").addEventListener("click", () => {
+    resetAuthForm();
+    setAuthMode("signin");
+  });
+  document.getElementById("offlineBtn").addEventListener("click", () => {
+    enterApp(null);
+    toast("Offline mode. Your tasks stay on this device.");
+  });
+  document.getElementById("logoutBtn").addEventListener("click", async () => {
+    try {
+      const client = sb();
+      if (client) await client.auth.signOut();
+    } catch (e) { /* fall through */ }
+    cloudUser = null;
+    clearTimeout(pushTimer);
+    document.querySelector(".app").hidden = true;
+    document.getElementById("authScreen").hidden = false;
+    resetAuthForm();
+    setAuthMode("signin");
+    updateUserChip();
+    setSyncStatus("offline");
+    toast("Signed out. Your local copy stays on this device.");
+  });
+}
+
+/* ---------- entering the app ---------- */
+
+function enterApp(user) {
+  cloudUser = user || null;
+  cloudPushSuspended = true;
+  document.getElementById("authScreen").hidden = true;
+  document.querySelector(".app").hidden = false;
+  bootApp();
+  updateUserChip();
+  cloudPushSuspended = false;
+  if (cloudUser) syncFromCloud();
+  else setSyncStatus("offline");
+}
+
+function showAuthScreen() {
+  document.getElementById("authScreen").hidden = false;
+}
+
+async function initAuth() {
+  wireAuthUI();
+  applyTheme();
+  updateUserChip();
+  setSyncStatus("offline");
+  if (!cloudConfigured()) { showAuthScreen(); return; }
+  try {
+    const { data, error } = await sb().auth.getSession();
+    if (error) throw error;
+    if (data && data.session) enterApp(data.session.user);
+    else showAuthScreen();
+  } catch (e) {
+    showAuthScreen();
+  }
+}
+
+/* ---------- PWA + connectivity ---------- */
+
+if ("serviceWorker" in navigator && location.protocol.indexOf("http") === 0) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("sw.js").catch(() => {});
+  });
+}
+window.addEventListener("online", () => {
+  if (cloudUser) pushToCloud();
+});
+
+initAuth();
