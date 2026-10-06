@@ -1431,7 +1431,7 @@ body.dragging, body.dragging * { user-select: none !important; -webkit-user-sele
 body.dragging { cursor: grabbing; }
 
 /* ============ auth screen ============ */
-.app[hidden], #authScreen[hidden] { display: none !important; }
+.app[hidden], #authScreen[hidden], #authConfirm[hidden], #pwStrength[hidden] { display: none !important; }
 
 .auth-screen {
   position: fixed; inset: 0; z-index: 100;
