@@ -66,7 +66,9 @@ python3 -m http.server 8000
   across devices. Everything still works offline first in `localStorage`;
   a status dot in the sidebar shows synced / syncing / offline. There is
   also a "Continue without an account (offline)" path that keeps the app
-  fully local. XP, medals, streaks, and settings stay on-device by design.
+  fully local. XP, medals, streaks, and settings sync too, through the
+  `user_profile` table (one row per user); only the live focus timer and
+  the import staging area stay on-device by design.
 - **📱 Installable (PWA):** manifest + service worker with an offline app
   shell, so you can Add to Home Screen on iPhone and launch it like an app.
 
@@ -78,7 +80,9 @@ The app works fully offline out of the box. To turn on cloud sync:
 2. In the Supabase dashboard, open the **SQL editor** and run the whole
    `supabase-migration.sql` file from this repo. It creates the `goals`,
    `tasks`, `wishlist`, `notes`, and `routines` tables with row-level
-   security so each user only ever sees their own rows.
+   security so each user only ever sees their own rows. Then run
+   `supabase-migration-2.sql` — it adds the `user_profile` table (one row
+   per user) for XP, medals, activity, streak, theme, and settings.
 3. Go to **Project Settings → API** in the dashboard and copy:
    - **Project URL** → paste as `url` in `supabase-config.js`
    - **anon / publishable key** → paste as `anonKey` in `supabase-config.js`
@@ -106,3 +110,29 @@ Dashboard → Authentication → Providers → Email and disable
   ordered by urgency and impact. Suggestions can be sent into per-category inbox goals with one tap.
   Note: live two-way sync (Notion/Google OAuth) isn't possible on a static page with no server —
   import is the viable path, and everything stays on your device.
+
+## Native iOS app (Capacitor)
+
+The web app is wrapped with [Capacitor](https://capacitorjs.com/) so it can run
+as a native iPhone app and, later, be submitted to the App Store. No rewrite:
+the same HTML/CSS/JS runs inside a native shell.
+
+**One-time setup (on a Mac with Xcode installed):**
+
+1. `npm install`
+2. `npx cap add ios` — creates the native `ios/` project (gitignored)
+3. `npm run sync:ios` — copies the web app into `www/` and syncs it into the
+   native project. Re-run after every web change.
+4. Open `ios/App/App.xcworkspace` in Xcode, pick your iPhone as the target,
+   and press Run. (A free Apple ID works for running on your own device;
+   the $99/year Apple Developer Program is only needed for TestFlight /
+   App Store distribution.)
+
+**Notes**
+
+- Bundle id: `com.rodrigocazuza.taskbreaker` (change in `capacitor.config.ts`
+  and Xcode before App Store submission).
+- The service worker intentionally does not register inside the native
+  WebView (`capacitor://` protocol); the app shell is bundled with the app.
+- Supabase Auth works in the WebView. Email confirmation / password-reset
+  links still open the web URL — confirm there, then sign in inside the app.
