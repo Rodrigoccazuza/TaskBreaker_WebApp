@@ -2729,6 +2729,9 @@ function showAuthView(name) {
 
 function showConfirmState(email) {
   document.getElementById("authConfirmEmail").textContent = email;
+  const msg = document.getElementById("authResendMsg");
+  msg.textContent = "";
+  msg.hidden = true;
   showAuthView("confirm");
 }
 
@@ -2796,6 +2799,23 @@ function wireAuthUI() {
   document.getElementById("authBackBtn").addEventListener("click", () => {
     resetAuthForm();
     setAuthMode("signin");
+  });
+  document.getElementById("authResendBtn").addEventListener("click", async () => {
+    const email = document.getElementById("authConfirmEmail").textContent;
+    const msg = document.getElementById("authResendMsg");
+    const btn = document.getElementById("authResendBtn");
+    btn.disabled = true;
+    try {
+      const { error } = await sb().auth.resend({ type: "signup", email });
+      if (error) throw error;
+      msg.textContent = "Sent — check your inbox for the new link.";
+      msg.hidden = false;
+    } catch (err) {
+      msg.textContent = friendlyAuthError(err && err.message);
+      msg.hidden = false;
+    } finally {
+      btn.disabled = false;
+    }
   });
   /* ---------- forgot password ---------- */
   document.getElementById("forgotBtn").addEventListener("click", () => {
