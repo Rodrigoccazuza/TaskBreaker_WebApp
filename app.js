@@ -2305,12 +2305,22 @@ function cloudConfigured() {
   return !!ok && typeof supabase !== "undefined" && !!supabase.createClient;
 }
 
+function makeClient(remember) {
+  const c = window.TB_SUPABASE;
+  return supabase.createClient(c.url, c.anonKey, {
+    auth: { storage: remember ? window.localStorage : window.sessionStorage },
+  });
+}
+
 function sb() {
   if (!sbClient && cloudConfigured()) {
-    const c = window.TB_SUPABASE;
-    sbClient = supabase.createClient(c.url, c.anonKey);
+    sbClient = makeClient(true);
   }
   return sbClient;
+}
+
+function resetClient(remember) {
+  sbClient = cloudConfigured() ? makeClient(remember) : null;
 }
 
 /* ---------- sync status + user chip ---------- */
@@ -2651,20 +2661,35 @@ function setAuthLoading(on) {
   btn.textContent = on ? "Please wait…" : (authMode === "signup" ? "Create account" : "Sign in");
 }
 
+function showAuthView(name) {
+  // name: "form" | "confirm" | "reset" | "newpw"
+  document.getElementById("authForm").hidden = name !== "form";
+  document.querySelector(".auth-tabs").style.display = name === "form" ? "" : "none";
+  document.getElementById("authConfirm").hidden = name !== "confirm";
+  document.getElementById("authReset").hidden = name !== "reset";
+  document.getElementById("authNewPw").hidden = name !== "newpw";
+}
+
 function showConfirmState(email) {
-  document.getElementById("authForm").hidden = true;
-  document.querySelector(".auth-tabs").style.display = "none";
   document.getElementById("authConfirmEmail").textContent = email;
-  document.getElementById("authConfirm").hidden = false;
+  showAuthView("confirm");
 }
 
 function resetAuthForm() {
-  document.getElementById("authForm").hidden = false;
-  document.querySelector(".auth-tabs").style.display = "";
-  document.getElementById("authConfirm").hidden = true;
+  showAuthView("form");
   document.getElementById("authEmail").value = "";
   document.getElementById("authPassword").value = "";
   document.getElementById("pwStrength").hidden = true;
+  document.getElementById("resetEmail").value = "";
+  const resetMsg = document.getElementById("resetMsg");
+  resetMsg.textContent = "";
+  resetMsg.hidden = true;
+  resetMsg.classList.remove("error");
+  document.getElementById("newPassword").value = "";
+  const newPwMsg = document.getElementById("newPwMsg");
+  newPwMsg.textContent = "";
+  newPwMsg.hidden = true;
+  newPwMsg.classList.remove("error");
   setHint(document.getElementById("authEmail"), document.getElementById("authEmailHint"), "", false);
   setHint(document.getElementById("authPassword"), document.getElementById("authPasswordHint"), "", false);
   clearAuthError();
@@ -2690,8 +2715,10 @@ function wireAuthUI() {
     }
     const email = document.getElementById("authEmail").value.trim();
     const password = document.getElementById("authPassword").value;
+    const remember = document.getElementById("authRemember").checked;
     clearAuthError();
     setAuthLoading(true);
+    resetClient(remember);
     try {
       if (authMode === "signup") {
         const { data, error } = await sb().auth.signUp({ email, password });
@@ -2712,6 +2739,85 @@ function wireAuthUI() {
   document.getElementById("authBackBtn").addEventListener("click", () => {
     resetAuthForm();
     setAuthMode("signin");
+  });
+  /* ---------- forgot password ---------- */
+  document.getElementById("forgotBtn").addEventListener("click", () => {
+    document.getElementById("resetEmail").value = document.getElementById("authEmail").value.trim();
+    const msg = document.getElementById("resetMsg");
+    msg.textContent = "";
+    msg.hidden = true;
+    msg.classList.remove("error");
+    clearAuthError();
+    showAuthView("reset");
+  });
+  document.getElementById("resetBack").addEventListener("click", () => {
+    showAuthView("form");
+  });
+  document.getElementById("resetSend").addEventListener("click", async () => {
+    const emailInput = document.getElementById("resetEmail");
+    const msg = document.getElementById("resetMsg");
+    const btn = document.getElementById("resetSend");
+    const email = emailInput.value.trim();
+    msg.classList.remove("error");
+    if (!emailRe.test(email)) {
+      msg.textContent = "Enter a valid email address.";
+      msg.classList.add("error");
+      msg.hidden = false;
+      return;
+    }
+    if (!cloudConfigured()) {
+      msg.textContent = "Cloud sync is not set up yet.";
+      msg.classList.add("error");
+      msg.hidden = false;
+      return;
+    }
+    btn.disabled = true;
+    try {
+      const { error } = await sb().auth.resetPasswordForEmail(email, {
+        redirectTo: location.origin + location.pathname,
+      });
+      if (error) throw error;
+      msg.textContent = "If an account exists for this email, a reset link is on its way.";
+      msg.hidden = false;
+    } catch (err) {
+      msg.textContent = friendlyAuthError(err && err.message);
+      msg.classList.add("error");
+      msg.hidden = false;
+    } finally {
+      btn.disabled = false;
+    }
+  });
+  /* ---------- set a new password (recovery landing) ---------- */
+  document.getElementById("newPasswordSave").addEventListener("click", async () => {
+    const input = document.getElementById("newPassword");
+    const msg = document.getElementById("newPwMsg");
+    const btn = document.getElementById("newPasswordSave");
+    const v = input.value;
+    msg.classList.remove("error");
+    if (!v || v.length < 8) {
+      msg.textContent = "Use at least 8 characters.";
+      msg.classList.add("error");
+      msg.hidden = false;
+      return;
+    }
+    btn.disabled = true;
+    try {
+      const { error } = await sb().auth.updateUser({ password: v });
+      if (error) throw error;
+      msg.textContent = "Password updated. Taking you back to sign in…";
+      msg.hidden = false;
+      try { history.replaceState(null, "", location.pathname + location.search); } catch (e) {}
+      window.setTimeout(() => {
+        showAuthView("form");
+        setAuthMode("signin");
+      }, 1500);
+    } catch (err) {
+      msg.textContent = friendlyAuthError(err && err.message);
+      msg.classList.add("error");
+      msg.hidden = false;
+    } finally {
+      btn.disabled = false;
+    }
   });
   document.getElementById("offlineBtn").addEventListener("click", () => {
     enterApp(null);
@@ -2761,8 +2867,17 @@ async function initAuth() {
   try {
     const { data, error } = await sb().auth.getSession();
     if (error) throw error;
-    if (data && data.session) enterApp(data.session.user);
-    else showAuthScreen();
+    if (data && data.session) {
+      // Password-recovery links land here with #...type=recovery — let the
+      // user choose a new password instead of entering the app directly.
+      if (location.hash.indexOf("type=recovery") !== -1) {
+        showAuthScreen();
+        showAuthView("newpw");
+        document.getElementById("newPassword").focus();
+        return;
+      }
+      enterApp(data.session.user);
+    } else showAuthScreen();
   } catch (e) {
     showAuthScreen();
   }
