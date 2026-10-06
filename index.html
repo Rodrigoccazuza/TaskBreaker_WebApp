@@ -9,9 +9,65 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;500;700;800&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="styles.css" />
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#101010" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Task Breaker" />
+<link rel="icon" type="image/png" href="icons/icon-192.png" />
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
 </head>
 <body data-theme="light">
-<div class="app">
+
+<!-- ============ AUTH ============ -->
+<div class="auth-screen" id="authScreen">
+  <div class="auth-bg" aria-hidden="true"><div class="auth-grain"></div></div>
+  <div class="auth-wrap">
+    <div class="auth-brand">
+      <span class="auth-mark" aria-hidden="true"><i class="bi bi-lightning-charge"></i></span>
+      <div>
+        <h1>Task Breaker</h1>
+        <p>Progress Tracker</p>
+      </div>
+    </div>
+    <p class="auth-headline">Your goals, everywhere you are.</p>
+    <p class="auth-sub">Sign in to sync your tasks across your devices. Your data stays private to your account.</p>
+    <div class="auth-card">
+      <div class="auth-tabs" role="tablist" aria-label="Sign in or create account">
+        <button type="button" class="auth-tab active" data-mode="signin" role="tab" aria-selected="true">Sign in</button>
+        <button type="button" class="auth-tab" data-mode="signup" role="tab" aria-selected="false">Create account</button>
+      </div>
+      <form class="auth-form" id="authForm" novalidate>
+        <label class="auth-field">
+          <span>Email</span>
+          <input type="email" id="authEmail" class="auth-input" placeholder="you@example.com" autocomplete="email" />
+          <small class="auth-hint" id="authEmailHint"></small>
+        </label>
+        <label class="auth-field">
+          <span>Password</span>
+          <input type="password" id="authPassword" class="auth-input" placeholder="At least 8 characters" autocomplete="current-password" />
+          <small class="auth-hint" id="authPasswordHint"></small>
+        </label>
+        <div class="pw-strength" id="pwStrength" hidden>
+          <div class="pw-track"><div class="pw-bar" id="pwBar"></div></div>
+          <span class="pw-label" id="pwLabel"></span>
+        </div>
+        <p class="auth-form-error" id="authFormError" role="alert" hidden></p>
+        <button type="submit" class="btn btn-primary auth-submit" id="authSubmit">Sign in</button>
+      </form>
+      <div class="auth-confirm" id="authConfirm" hidden>
+        <span class="auth-confirm-icon" aria-hidden="true"><i class="bi bi-envelope-check"></i></span>
+        <h2>Check your inbox</h2>
+        <p>We sent a confirmation link to <strong id="authConfirmEmail"></strong>. Click it, then come back and sign in.</p>
+        <button type="button" class="btn btn-secondary" id="authBackBtn">Back to sign in</button>
+      </div>
+      <button type="button" class="auth-offline" id="offlineBtn">Continue without an account (offline)</button>
+    </div>
+  </div>
+</div>
+
+<div class="app" hidden>
 
   <!-- ============ SIDEBAR ============ -->
   <aside class="sidebar">
@@ -36,6 +92,11 @@
     </nav>
 
     <div class="sidebar-bottom">
+      <div class="user-chip" id="userChip">
+        <span class="sync-dot offline" id="syncDot" title="Offline"></span>
+        <span class="user-email" id="userEmail">Local only</span>
+        <button type="button" class="icon-btn" id="logoutBtn" title="Log out" aria-label="Log out" hidden><i class="bi bi-box-arrow-right"></i></button>
+      </div>
       <div class="undo-row">
         <button type="button" class="icon-btn" id="undoBtn" title="Undo (Cmd/Ctrl+Z)" aria-label="Undo"><i class="bi bi-arrow-counterclockwise"></i></button>
         <button type="button" class="icon-btn" id="redoBtn" title="Redo (Cmd/Ctrl+Shift+Z)" aria-label="Redo"><i class="bi bi-arrow-clockwise"></i></button>
@@ -361,6 +422,8 @@
 </div>
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="supabase-config.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
