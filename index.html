@@ -26,13 +26,8 @@
   <div class="auth-wrap">
     <div class="auth-brand">
       <span class="auth-mark" aria-hidden="true"><i class="bi bi-lightning-charge"></i></span>
-      <div>
-        <h1>Task Breaker</h1>
-        <p>Progress Tracker</p>
-      </div>
+      <h1>Task Breaker</h1>
     </div>
-    <p class="auth-headline">Your goals, everywhere you are.</p>
-    <p class="auth-sub">Sign in to sync your tasks across your devices. Your data stays private to your account.</p>
     <div class="auth-card">
       <div class="auth-tabs" role="tablist" aria-label="Sign in or create account">
         <button type="button" class="auth-tab active" data-mode="signin" role="tab" aria-selected="true">Sign in</button>
@@ -46,15 +41,23 @@
         </label>
         <label class="auth-field">
           <span>Password</span>
-          <input type="password" id="authPassword" class="auth-input" placeholder="At least 8 characters" autocomplete="current-password" />
+          <input type="password" id="authPassword" class="auth-input" placeholder="Enter your password" autocomplete="current-password" />
           <small class="auth-hint" id="authPasswordHint"></small>
         </label>
         <div class="pw-strength" id="pwStrength" hidden>
           <div class="pw-track"><div class="pw-bar" id="pwBar"></div></div>
           <span class="pw-label" id="pwLabel"></span>
         </div>
+        <div class="auth-remember-row">
+          <label class="auth-remember">
+            <input type="checkbox" id="authRemember" checked />
+            <span class="remember-box" aria-hidden="true"></span>
+            <span class="remember-label">Remember me</span>
+          </label>
+          <button type="button" class="linklike" id="forgotBtn">Forgot password?</button>
+        </div>
         <p class="auth-form-error" id="authFormError" role="alert" hidden></p>
-        <button type="submit" class="btn btn-primary auth-submit" id="authSubmit">Sign in</button>
+        <button type="submit" class="auth-submit" id="authSubmit">Sign in</button>
       </form>
       <div class="auth-confirm" id="authConfirm" hidden>
         <span class="auth-confirm-icon" aria-hidden="true"><i class="bi bi-envelope-check"></i></span>
@@ -62,8 +65,29 @@
         <p>We sent a confirmation link to <strong id="authConfirmEmail"></strong>. Click it, then come back and sign in.</p>
         <button type="button" class="btn btn-secondary" id="authBackBtn">Back to sign in</button>
       </div>
-      <button type="button" class="auth-offline" id="offlineBtn">Continue without an account (offline)</button>
+      <div class="auth-reset" id="authReset" hidden>
+        <h2>Reset password</h2>
+        <p>Enter the email for your account and we will send you a reset link.</p>
+        <label class="auth-field">
+          <span>Email</span>
+          <input type="email" id="resetEmail" class="auth-input" placeholder="you@example.com" autocomplete="email" />
+        </label>
+        <p class="auth-reset-msg" id="resetMsg" role="status" hidden></p>
+        <button type="button" class="auth-submit" id="resetSend">Send reset link</button>
+        <button type="button" class="linklike" id="resetBack">Back to sign in</button>
+      </div>
+      <div class="auth-reset" id="authNewPw" hidden>
+        <h2>Choose a new password</h2>
+        <p>Enter a new password for your account.</p>
+        <label class="auth-field">
+          <span>New password</span>
+          <input type="password" id="newPassword" class="auth-input" placeholder="At least 8 characters" autocomplete="new-password" />
+        </label>
+        <p class="auth-reset-msg" id="newPwMsg" role="status" hidden></p>
+        <button type="button" class="auth-submit" id="newPasswordSave">Save new password</button>
+      </div>
     </div>
+    <button type="button" class="auth-offline" id="offlineBtn">Continue without an account (offline)</button>
   </div>
 </div>
 
