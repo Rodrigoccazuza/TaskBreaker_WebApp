@@ -1,6 +1,10 @@
-/* Task Breaker v4 — neumorphic edition.
+/* Task Breaker v6 — neumorphic edition.
    Dashboard, weekly routines, rewards (XP/medals/streaks), wishlist,
    notes, email digest, deadlines + calendar, voice input.
+   v6 adds: collapsible cards/sections, FAB + mobile bottom bar,
+   protocols, @tags, suggest-a-breakdown, calendar view, vision board,
+   onboarding, digest reports, textures, note colors + sharing,
+   task moving, priority pins and a lock-in checklist overlay.
    Static app: everything persists in localStorage. */
 
 const STORAGE_KEY = "taskbreaker-v4";
@@ -113,6 +117,30 @@ const BI_MAP = {
  "square": "square",
  "clock": "clock",
  "inbox": "inbox",
+ "grip-vertical": "grip-vertical",
+ "chevron-down": "chevron-down",
+ "chevron-left": "chevron-left",
+ "chevron-right": "chevron-right",
+ "pin": "pin-angle",
+ "share": "share",
+ "magic": "magic",
+ "move": "arrows-move",
+ "diagram": "diagram-3",
+ "images": "images",
+ "shield": "shield-lock",
+ "chat": "chat-dots",
+ "copy": "clipboard",
+ "download": "download",
+ "import": "box-arrow-in-down",
+ "play-fill": "play-fill",
+ "refresh": "arrow-repeat",
+ "grid": "grid-3x3-gap",
+ "list": "list-ul",
+ "journal": "journal-text",
+ "bookmark": "bookmark-plus",
+ "check-all": "check2-all",
+ "eye": "eye",
+ "pencil": "pencil",
  "map": "map",
  "clipboard": "clipboard",
  "file": "file-earmark",
@@ -225,6 +253,8 @@ function normalizeTask(t) {
     text: t.text || "",
     done: !!t.done,
     deadline: t.deadline || null,
+    tags: Array.isArray(t.tags) ? t.tags.map((x) => String(x).toLowerCase().replace(/^@/, "")).filter(Boolean).slice(0, 6) : [],
+    pinned: !!t.pinned,
     subtasks: (t.subtasks || []).map(normalizeTask),
   };
 }
@@ -240,6 +270,7 @@ function normalizeGoal(g) {
     category: catOf(g.category).id,
     tasks: (g.tasks || []).map(normalizeTask),
     color: g.color && GOAL_COLORS[g.color] ? g.color : null,
+    kind: g.kind === "project" ? "project" : "goal",
   };
 }
 
@@ -277,6 +308,23 @@ function blankState() {
     imports: [],
     focusSessions: 0,
     ui: { skipGoalDeleteConfirm: false },
+    protocols: [],
+    vision: [],
+    reports: [],
+    settings: { autoResetRoutines: true, texture: "none" },
+    onboarded: false,
+    categories: null,
+    purpose: "",
+  };
+}
+
+function normalizeProtocol(p) {
+  p = p || {};
+  return {
+    id: p.id || uid(),
+    name: String(p.name || "Untitled protocol").slice(0, 80),
+    items: (Array.isArray(p.items) ? p.items : []).map((i) => String(i).slice(0, 120)).filter(Boolean).slice(0, 60),
+    created: p.created || null,
   };
 }
 
@@ -285,7 +333,10 @@ function normalize(data) {
   return {
     goals: (data.goals || []).map(normalizeGoal),
     wishlist: (data.wishlist || []).map((w) => ({ id: w.id || uid(), text: w.text || "", done: !!w.done })),
-    notes: (data.notes || []).map((n) => ({ id: n.id || uid(), title: n.title || "", body: n.body || "" })),
+    notes: (data.notes || []).map((n) => ({
+      id: n.id || uid(), title: n.title || "", body: n.body || "",
+      color: n.color && GOAL_COLORS[n.color] ? n.color : null,
+    })),
     routines: (data.routines || []).map(normalizeRoutine),
     xp: +data.xp || 0,
     medals: Array.isArray(data.medals) ? data.medals.filter((m) => MEDALS.some((d) => d.id === m)) : [],
@@ -299,6 +350,20 @@ function normalize(data) {
     imports: (data.imports || []).map(normalizeImport),
     focusSessions: +data.focusSessions || 0,
     ui: { skipGoalDeleteConfirm: !!(data.ui && data.ui.skipGoalDeleteConfirm) },
+    protocols: (data.protocols || []).map(normalizeProtocol),
+    vision: (data.vision || []).map((v) => ({
+      id: v.id || uid(), url: String(v.url || "").slice(0, 1000), caption: String(v.caption || "").slice(0, 120),
+    })).filter((v) => v.url),
+    reports: (data.reports || []).map((r) => ({
+      id: r.id || uid(), date: String(r.date || ""), text: String(r.text || ""),
+    })).slice(0, 24),
+    settings: {
+      autoResetRoutines: !(data.settings && data.settings.autoResetRoutines === false),
+      texture: data.settings && ["dots", "grid", "diagonal"].includes(data.settings.texture) ? data.settings.texture : "none",
+    },
+    onboarded: !!data.onboarded,
+    categories: data.categories && typeof data.categories === "object" ? data.categories : null,
+    purpose: String(data.purpose || "").slice(0, 200),
   };
 }
 
@@ -615,14 +680,17 @@ document.getElementById("themeToggle").addEventListener("change", (e) => {
 
 /* ================= navigation ================= */
 
-document.querySelectorAll(".nav-btn").forEach((btn) => {
-  btn.addEventListener("click", () => {
-    document.querySelectorAll(".nav-btn").forEach((b) => b.classList.remove("active"));
-    btn.classList.add("active");
-    document.querySelectorAll(".page").forEach((p) => p.classList.remove("active"));
-    document.getElementById("page-" + btn.dataset.page).classList.add("active");
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  });
+function goToPage(page) {
+  document.querySelectorAll(".nav-btn, .mobile-bar-btn").forEach((b) =>
+    b.classList.toggle("active", b.dataset.page === page));
+  document.querySelectorAll(".page").forEach((p) => p.classList.remove("active"));
+  const target = document.getElementById("page-" + page);
+  if (target) target.classList.add("active");
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+document.querySelectorAll(".nav-btn, .mobile-bar-btn").forEach((btn) => {
+  btn.addEventListener("click", () => goToPage(btn.dataset.page));
 });
 
 /* ================= dashboard ================= */
@@ -636,7 +704,18 @@ function renderWheels() {
     const s = categoryStats(cat.id);
     const off = RING_C - (RING_C * s.pct) / 100;
 
-    const gauge = el("div", "gauge");
+    const gauge = el("div", "gauge" + (dashFilter === cat.id ? " gauge-active" : ""));
+    gauge.setAttribute("role", "button");
+    gauge.setAttribute("tabindex", "0");
+    gauge.title = dashFilter === cat.id ? "Show all categories" : "Show only " + cat.name;
+    gauge.addEventListener("click", () => {
+      dashFilter = dashFilter === cat.id ? null : cat.id;
+      tagFilter = null;
+      renderAll();
+    });
+    gauge.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); gauge.click(); }
+    });
     const dial = el("div", "dial");
     const face = el("div", "dial-face");
     face.innerHTML =
@@ -786,6 +865,19 @@ function taskNode(task, removeTask, afterChange, goalTitle) {
   } else {
     row.append(check, span);
   }
+  if (task.pinned) {
+    const pin = el("span", "pin-mark");
+    pin.innerHTML = icon("pin", 12);
+    pin.title = "Pinned as priority";
+    row.appendChild(pin);
+  }
+  (task.tags || []).forEach((tg) => {
+    const chip = el("button", "tag-chip", "@" + tg);
+    chip.type = "button";
+    chip.title = "Filter by @" + tg;
+    chip.addEventListener("click", () => { tagFilter = tg; dashFilter = null; renderAll(); });
+    row.appendChild(chip);
+  });
 
   if (state.focus && state.focus.taskId === task.id) {
     li.classList.add("locked");
@@ -900,9 +992,10 @@ function showSubtaskForm(li, task) {
   form.append(input, add);
   form.addEventListener("submit", (e) => {
     e.preventDefault();
-    const text = input.value.trim();
-    if (!text) return;
-    task.subtasks.push({ id: uid(), text, done: false, deadline: null, subtasks: [] });
+    const raw = input.value.trim();
+    if (!raw) return;
+    const parsed = parseTags(raw);
+    task.subtasks.push(normalizeTask({ text: parsed.text || raw, tags: parsed.tags }));
     expandedTasks.add(task.id);
     save(); renderAll();
   });
@@ -910,7 +1003,7 @@ function showSubtaskForm(li, task) {
   input.focus();
 }
 
-function goalCard(goal) {
+function goalCard(goal, taskSubset) {
   const card = el("article", "card goal-card");
   card.dataset.goal = goal.id;
   card.style.setProperty("--goal-color", goalColorValue(goal));
@@ -926,6 +1019,9 @@ function goalCard(goal) {
   const cb = el("span", "badge cat");
   cb.innerHTML = icon(cat.icon, 12) + " " + cat.name;
   badges.appendChild(cb);
+  const kindB = el("span", "badge kind");
+  kindB.innerHTML = icon(goal.kind === "project" ? "diagram" : "target", 12) + " " + (goal.kind === "project" ? "Project" : "Goal");
+  badges.appendChild(kindB);
   if (goal.timeline) {
     const tb = el("span", "badge");
     tb.innerHTML = icon("clock", 12) + " " + goal.timeline;
@@ -940,6 +1036,15 @@ function goalCard(goal) {
   headings.appendChild(badges);
   top.appendChild(headings);
 
+  const collapseBtn = setIcon(el("button", "icon-btn tool goal-collapse"), "chevron-down", 15);
+  collapseBtn.type = "button";
+  collapseBtn.title = "Minimize / expand this card";
+  collapseBtn.setAttribute("aria-label", "Minimize or expand goal");
+  collapseBtn.addEventListener("click", () => {
+    if (collapsedGoals.has(goal.id)) collapsedGoals.delete(goal.id);
+    else collapsedGoals.add(goal.id);
+    renderGoals();
+  });
   const calBtn = setIcon(el("button", "icon-btn tool"), "calendar", 15);
   calBtn.title = "Goal deadline & calendar";
   calBtn.setAttribute("aria-label", "Set goal deadline");
@@ -968,8 +1073,10 @@ function goalCard(goal) {
     save(); renderAll();
     toast("Goal deleted \u2014 " + undoHint(), "warning");
   });
-  top.append(calBtn, colorBtn, del);
+  top.append(collapseBtn, calBtn, colorBtn, del);
   card.appendChild(top);
+  const isCollapsed = collapsedGoals.has(goal.id);
+  if (isCollapsed) card.classList.add("goal-collapsed");
 
   const pct = goalProgress(goal);
   const leaves = leafStats(goal.tasks);
@@ -983,7 +1090,9 @@ function goalCard(goal) {
   prog.appendChild(el("span", "progress-text", leaves.done + "/" + leaves.total + " done"));
   card.appendChild(prog);
   if (pct === 100 && goal.tasks.length) card.classList.add("complete");
+  if (isCollapsed) return card;
 
+  const shownTasks = taskSubset || goal.tasks;
   const list = el("ul", "task-list");
   const removeTop = (task) => {
     maybeCancelFocus(task.id);
@@ -1000,9 +1109,46 @@ function goalCard(goal) {
       renderAll();
     }
   };
-  goal.tasks.forEach((task) => list.appendChild(taskNode(task, removeTop, celebrate, goal.title)));
-  makeSortable(list, goal.tasks);
+  shownTasks.forEach((task) => list.appendChild(taskNode(task, removeTop, celebrate, goal.title)));
+  if (!taskSubset) makeSortable(list, goal.tasks);
   card.appendChild(list);
+
+  const actions = el("div", "goal-actions");
+  const checkAll = el("button", "btn btn-tertiary btn-sm");
+  checkAll.type = "button";
+  checkAll.innerHTML = icon("check-all", 13) + " Check all";
+  checkAll.addEventListener("click", () => setAllLeaves(goal, true));
+  const uncheckAll = el("button", "btn btn-tertiary btn-sm");
+  uncheckAll.type = "button";
+  uncheckAll.innerHTML = icon("refresh", 13) + " Uncheck all";
+  uncheckAll.addEventListener("click", () => setAllLeaves(goal, false));
+  const protoBtn = el("button", "btn btn-tertiary btn-sm");
+  protoBtn.type = "button";
+  protoBtn.innerHTML = icon("diagram", 13) + " Save as protocol";
+  protoBtn.addEventListener("click", () => saveGoalAsProtocol(goal));
+  const shareBtn = el("button", "btn btn-tertiary btn-sm");
+  shareBtn.type = "button";
+  shareBtn.innerHTML = icon("share", 13) + " Share";
+  shareBtn.addEventListener("click", () => shareGoal(goal));
+  const jsonBtn = el("button", "btn btn-tertiary btn-sm");
+  jsonBtn.type = "button";
+  jsonBtn.innerHTML = icon("download", 13) + " JSON";
+  jsonBtn.title = "Download this goal as JSON — a friend can import it in Connections";
+  jsonBtn.addEventListener("click", () => {
+    downloadFile(goal.title.replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "-").toLowerCase() + "-goal.json",
+      goalToJSON(goal), "application/json");
+    toast("Goal downloaded — import it via Connections");
+  });
+  actions.append(checkAll, uncheckAll, protoBtn, shareBtn, jsonBtn);
+  if (pct === 100 && goal.tasks.length) {
+    const again = el("button", "btn btn-tertiary btn-sm");
+    again.type = "button";
+    again.innerHTML = icon("play-fill", 13) + " Run again";
+    again.title = "Uncheck everything and run this goal again";
+    again.addEventListener("click", () => setAllLeaves(goal, false));
+    actions.appendChild(again);
+  }
+  card.appendChild(actions);
 
   const form = el("form", "add-task");
   const input = el("input");
@@ -1015,9 +1161,10 @@ function goalCard(goal) {
   form.append(input, mic, add);
   form.addEventListener("submit", (e) => {
     e.preventDefault();
-    const text = input.value.trim();
-    if (!text) return;
-    goal.tasks.push({ id: uid(), text, done: false, deadline: null, subtasks: [] });
+    const raw = input.value.trim();
+    if (!raw) return;
+    const parsed = parseTags(raw);
+    goal.tasks.push(normalizeTask({ text: parsed.text || raw, tags: parsed.tags }));
     save(); renderAll();
   });
   card.appendChild(form);
@@ -1028,7 +1175,22 @@ function goalCard(goal) {
 function renderGoals() {
   const wrap = document.getElementById("goalsByCategory");
   wrap.innerHTML = "";
+
+  if (dashFilter || tagFilter) {
+    const bar = el("div", "filter-bar");
+    const label = tagFilter
+      ? "Showing tasks tagged @" + tagFilter
+      : "Showing only " + catOf(dashFilter).name;
+    bar.appendChild(el("span", "filter-label", label));
+    const clear = el("button", "btn btn-secondary btn-sm", "Back · Show all");
+    clear.type = "button";
+    clear.addEventListener("click", () => { dashFilter = null; tagFilter = null; renderAll(); });
+    bar.appendChild(clear);
+    wrap.appendChild(bar);
+  }
+
   CATEGORIES.forEach((cat) => {
+    if (dashFilter && cat.id !== dashFilter) return;
     const section = el("div", "cat-section");
     const head = el("div", "cat-head");
     const h3 = el("h3");
@@ -1036,14 +1198,34 @@ function renderGoals() {
     head.appendChild(h3);
     const goals = state.goals.filter((g) => g.category === cat.id);
     head.appendChild(el("span", "cat-count", goals.length + (goals.length === 1 ? " goal" : " goals")));
+    const toggle = setIcon(el("button", "icon-btn tool cat-toggle"), "chevron-down", 14);
+    toggle.type = "button";
+    toggle.title = "Collapse / expand this category";
+    toggle.setAttribute("aria-label", "Collapse or expand " + cat.name);
+    toggle.addEventListener("click", () => {
+      if (collapsedCats.has(cat.id)) collapsedCats.delete(cat.id);
+      else collapsedCats.add(cat.id);
+      renderGoals();
+    });
+    head.appendChild(toggle);
     section.appendChild(head);
+    if (collapsedCats.has(cat.id)) {
+      section.classList.add("cat-collapsed");
+      wrap.appendChild(section);
+      return;
+    }
 
-    if (goals.length) {
+    const visible = tagFilter
+      ? goals.map((g) => ({ goal: g, tasks: filterTasksByTag(g.tasks, tagFilter) })).filter((x) => x.tasks.length)
+      : goals.map((g) => ({ goal: g, tasks: null }));
+
+    if (visible.length) {
       const grid = el("div", "goal-grid");
-      goals.forEach((g) => grid.appendChild(goalCard(g)));
+      visible.forEach((x) => grid.appendChild(goalCard(x.goal, x.tasks)));
       section.appendChild(grid);
     } else {
-      section.appendChild(el("p", "empty-note", "No goals here yet — add one below."));
+      section.appendChild(el("p", "empty-note",
+        tagFilter ? "No tasks tagged @" + tagFilter + " here." : "No goals here yet — add one below."));
     }
     wrap.appendChild(section);
   });
@@ -1059,6 +1241,8 @@ document.getElementById("addGoalBtn").addEventListener("click", () => {
     timeline: document.getElementById("newGoalTimeline").value.trim(),
     deadline: document.getElementById("newGoalDeadline").value || null,
     category: document.getElementById("newGoalCategory").value,
+    kind: document.getElementById("newGoalType").value === "project" ? "project" : "goal",
+    color: null,
     tasks: [],
   });
   document.getElementById("newGoalTitle").value = "";
@@ -1072,7 +1256,19 @@ document.getElementById("addGoalBtn").addEventListener("click", () => {
 
 function routineWeekDone(r) {
   const wk = weekKey();
-  if (!r.done[wk]) r.done[wk] = [false, false, false, false, false, false, false];
+  if (!r.done[wk]) {
+    r.done[wk] = [false, false, false, false, false, false, false];
+    /* v6: when auto-reset is OFF, carry last week's checks into the new
+       week instead of starting blank. When it's ON (default), a new week
+       starts fresh — that is the reset. */
+    if (state.settings && state.settings.autoResetRoutines === false) {
+      const prior = Object.keys(r.done).filter((k) => k !== wk).sort().pop();
+      if (prior && Array.isArray(r.done[prior])) {
+        r.done[wk] = r.done[prior].slice(0, 7);
+        while (r.done[wk].length < 7) r.done[wk].push(false);
+      }
+    }
+  }
   return r.done[wk];
 }
 
@@ -1200,6 +1396,16 @@ function renderWishlist() {
       renderWishlist(); renderProfile(); renderRewards();
     });
     li.append(check, el("span", null, item.text));
+    const edit = setIcon(el("button", "task-del"), "pencil", 13);
+    edit.type = "button";
+    edit.setAttribute("aria-label", "Rename wish");
+    edit.title = "Rename";
+    edit.addEventListener("click", () => startInlineRename(li, item.text, (next) => {
+      item.text = next;
+      save(); renderWishlist(); renderProfile();
+      toast("Wish updated");
+    }));
+    li.appendChild(edit);
     const x = setIcon(el("button", "task-del"), "x", 13);
     x.setAttribute("aria-label", "Delete wish");
     x.addEventListener("click", () => {
@@ -1223,37 +1429,167 @@ document.getElementById("wishlistForm").addEventListener("submit", (e) => {
 
 /* ================= notes ================= */
 
+let noteColorSel = null;   /* color chosen in the composer */
+let noteFilter = null;     /* active color filter: null = all */
+
+function renderNoteColorPick() {
+  const wrap = document.getElementById("noteColorPick");
+  if (!wrap) return;
+  wrap.innerHTML = "";
+  const none = el("button", "swatch auto" + (noteColorSel === null ? " sel" : ""));
+  none.type = "button";
+  none.title = "No color";
+  none.setAttribute("aria-label", "No color");
+  none.innerHTML = '<i class="bi bi-palette"></i>';
+  none.addEventListener("click", () => { noteColorSel = null; renderNoteColorPick(); });
+  wrap.appendChild(none);
+  Object.keys(GOAL_COLORS).forEach((k) => {
+    const b = el("button", "swatch" + (noteColorSel === k ? " sel" : ""));
+    b.type = "button";
+    b.style.background = GOAL_COLORS[k];
+    b.title = k.charAt(0).toUpperCase() + k.slice(1);
+    b.setAttribute("aria-label", "Color " + k);
+    b.addEventListener("click", () => { noteColorSel = k; renderNoteColorPick(); });
+    wrap.appendChild(b);
+  });
+}
+
 function renderNotes() {
+  renderNoteColorPick();
+  const filterRow = document.getElementById("noteColorFilter");
+  if (filterRow) {
+    filterRow.innerHTML = "";
+    const used = [...new Set(state.notes.map((n) => n.color || "none"))];
+    if (state.notes.length && used.length > 1) {
+      const all = el("button", "note-filter-dot all" + (noteFilter === null ? " sel" : ""), "All");
+      all.type = "button";
+      all.addEventListener("click", () => { noteFilter = null; renderNotes(); });
+      filterRow.appendChild(all);
+      used.forEach((k) => {
+        const d = el("button", "note-filter-dot" + (noteFilter === k ? " sel" : ""));
+        d.type = "button";
+        d.title = k === "none" ? "Uncolored notes" : "Notes in " + k;
+        d.setAttribute("aria-label", d.title);
+        if (k !== "none") d.style.background = GOAL_COLORS[k];
+        else d.innerHTML = '<i class="bi bi-palette"></i>';
+        d.addEventListener("click", () => { noteFilter = noteFilter === k ? null : k; renderNotes(); });
+        filterRow.appendChild(d);
+      });
+      const hint = el("span", "note-filter-hint",
+        noteFilter ? ("Stacked: " + (noteFilter === "none" ? "uncolored" : noteFilter) + " notes") : "Tap a color to stack notes by color");
+      filterRow.appendChild(hint);
+    }
+  }
+
   const grid = document.getElementById("notesGrid");
   grid.innerHTML = "";
-  if (!state.notes.length) {
-    grid.appendChild(el("p", "empty-note", "No notes yet. Pin your first one above."));
+  const shown = state.notes.filter((n) => noteFilter === null || (n.color || "none") === noteFilter);
+  if (!shown.length) {
+    grid.appendChild(el("p", "empty-note", state.notes.length ? "No notes in this stack." : "No notes yet. Pin your first one above."));
     return;
   }
-  state.notes.forEach((note) => {
-    const card = el("article", "note-card");
-    card.appendChild(el("h4", null, note.title || "Untitled"));
-    if (note.body) card.appendChild(el("p", null, note.body));
-    const x = setIcon(el("button", "task-del"), "x", 13);
-    x.setAttribute("aria-label", "Delete note");
-    x.addEventListener("click", () => {
-      state.notes = state.notes.filter((n) => n.id !== note.id);
-      save(); renderNotes();
-    });
-    card.appendChild(x);
-    grid.appendChild(card);
+  /* group (stack) by color, keeping the newest first within each stack */
+  const order = ["none", ...Object.keys(GOAL_COLORS)];
+  const groups = new Map();
+  shown.forEach((n) => {
+    const k = n.color || "none";
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k).push(n);
   });
+  [...groups.keys()].sort((a, b) => order.indexOf(a) - order.indexOf(b)).forEach((k) => {
+    groups.get(k).forEach((note) => grid.appendChild(noteCard(note)));
+  });
+}
+
+function noteCard(note) {
+  const card = el("article", "note-card");
+  if (note.color && GOAL_COLORS[note.color]) {
+    card.style.setProperty("--note-color", GOAL_COLORS[note.color]);
+    card.classList.add("has-color");
+  }
+  const titleEl = el("h4", null, note.title || "Untitled");
+  titleEl.title = "Click to edit";
+  titleEl.addEventListener("click", () => startInlineRename(card, note.title || "", (next) => {
+    note.title = next;
+    save(); renderNotes();
+    toast("Note updated");
+  }, "h4"));
+  card.appendChild(titleEl);
+  if (note.body) {
+    const bodyEl = el("p", null, note.body);
+    bodyEl.title = "Click to edit";
+    bodyEl.addEventListener("click", () => startInlineRename(card, note.body, (next) => {
+      note.body = next;
+      save(); renderNotes();
+      toast("Note updated");
+    }, "p"));
+    card.appendChild(bodyEl);
+  }
+  const tools = el("div", "note-tools");
+  const share = setIcon(el("button", "icon-btn tool"), "share", 13);
+  share.type = "button";
+  share.title = "Share note (copy text or download)";
+  share.setAttribute("aria-label", "Share note");
+  share.addEventListener("click", () => shareNote(note));
+  const dl = setIcon(el("button", "icon-btn tool"), "download", 13);
+  dl.type = "button";
+  dl.title = "Download as .txt";
+  dl.setAttribute("aria-label", "Download note as text file");
+  dl.addEventListener("click", () => {
+    downloadFile((note.title || "note").replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "-").toLowerCase() + ".txt",
+      noteText(note), "text/plain");
+    toast("Note downloaded");
+  });
+  const x = setIcon(el("button", "icon-btn"), "x", 13);
+  x.type = "button";
+  x.setAttribute("aria-label", "Delete note");
+  x.addEventListener("click", () => {
+    state.notes = state.notes.filter((n) => n.id !== note.id);
+    save(); renderNotes();
+  });
+  tools.append(share, dl, x);
+  card.appendChild(tools);
+  return card;
+}
+
+function noteText(note) {
+  return (note.title ? note.title + "\n\n" : "") + (note.body || "");
+}
+
+function shareNote(note) {
+  shareText(note.title || "Task Breaker note", noteText(note));
+  toast("Note copied — send it to anyone");
 }
 
 document.getElementById("addNoteBtn").addEventListener("click", () => {
   const title = document.getElementById("noteTitle").value.trim();
   const body = document.getElementById("noteBody").value.trim();
   if (!title && !body) return;
-  state.notes.unshift({ id: uid(), title, body });
+  state.notes.unshift({ id: uid(), title, body, color: noteColorSel });
   document.getElementById("noteTitle").value = "";
   document.getElementById("noteBody").value = "";
   save(); renderNotes();
   toast("Note pinned");
+});
+
+document.getElementById("noteImportBtn").addEventListener("click", () => {
+  const ta = document.getElementById("noteImportText");
+  const raw = ta.value.trim();
+  if (!raw) { ta.focus(); return; }
+  const lines = raw.split("\n");
+  let title = "", body = raw;
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === "object" && (parsed.title || parsed.body)) {
+      title = String(parsed.title || "");
+      body = String(parsed.body || "");
+    }
+  } catch (e) { /* plain text */ }
+  if (!title && lines.length > 1) { title = lines[0].slice(0, 80); body = lines.slice(1).join("\n").trim() || raw; }
+  state.notes.unshift({ id: uid(), title, body, color: null });
+  ta.value = "";
+  save(); renderNotes();
+  toast("Note imported");
 });
 
 /* ================= digest ================= */
@@ -1331,6 +1667,49 @@ document.getElementById("sendDigestBtn").addEventListener("click", () => {
   window.location.href = "mailto:" + encodeURIComponent(to) + "?subject=" + subject + "&body=" + body;
 });
 
+/* ================= v6: digest reports ================= */
+
+function renderReports() {
+  const wrap = document.getElementById("reportList");
+  if (!wrap) return;
+  wrap.innerHTML = "";
+  if (!state.reports.length) {
+    wrap.appendChild(el("p", "empty-note", "No reports saved yet."));
+    return;
+  }
+  state.reports.forEach((r) => {
+    const item = el("div", "report-item");
+    const head = el("button", "report-head");
+    head.type = "button";
+    head.innerHTML = icon("journal", 14) + " " + r.date;
+    const body = el("div", "digest-preview report-body");
+    body.textContent = r.text;
+    body.hidden = true;
+    head.addEventListener("click", () => { body.hidden = !body.hidden; });
+    const acts = el("div", "report-actions");
+    const share = el("button", "btn btn-tertiary btn-sm", "Share");
+    share.type = "button";
+    share.addEventListener("click", () => shareText("Task Breaker report " + r.date, r.text));
+    const del = el("button", "btn btn-tertiary btn-sm", "Delete");
+    del.type = "button";
+    del.addEventListener("click", () => {
+      state.reports = state.reports.filter((x) => x.id !== r.id);
+      save(); renderReports();
+    });
+    acts.append(share, del);
+    item.append(head, acts, body);
+    wrap.appendChild(item);
+  });
+}
+
+document.getElementById("saveReportBtn").addEventListener("click", () => {
+  const date = new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+  state.reports.unshift({ id: uid(), date, text: buildDigest() });
+  state.reports = state.reports.slice(0, 24);
+  save(); renderReports();
+  toast("Report saved — find it under Digest › Reports");
+});
+
 /* ================= profile ================= */
 
 function renderProfile() {
@@ -1351,6 +1730,10 @@ function renderProfile() {
 
   document.getElementById("setVoice").checked = state.voice.celebrations;
   document.getElementById("setNotify").checked = state.notify.deadlines;
+  const ar = document.getElementById("setAutoReset");
+  if (ar) ar.checked = !(state.settings && state.settings.autoResetRoutines === false);
+  const tx = document.getElementById("setTexture");
+  if (tx) tx.value = (state.settings && state.settings.texture) || "none";
 }
 
 document.getElementById("setVoice").addEventListener("change", (e) => {
@@ -1408,21 +1791,28 @@ function renderAll() {
     new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
   renderAlerts();
   renderWheels();
+  renderPriority();
   renderGoals();
   renderRoutines();
   renderRewards();
   renderWishlist();
   renderNotes();
   renderDigestPreview();
+  renderReports();
   renderProfile();
   renderImports();
+  renderProtocols();
+  renderVision();
+  renderCalendar();
   renderFocusBar();
+  maybeCompleteFocusByChecklist();
 }
 
 let appBooted = false;
 function bootApp() {
   if (appBooted) return;
   appBooted = true;
+  initV6();
   attachMic(document.getElementById("noteMic"), document.getElementById("noteBody"));
 
   /* wishlist mic */
@@ -1454,10 +1844,12 @@ function normalizeFocus(f) {
     taskId: f.taskId || null,
     taskText: String(f.taskText || ""),
     goal: String(f.goal || ""),
+    goalId: f.goalId || null,
     totalSec: +f.totalSec || 0,
     remainingSec: +f.remainingSec || 0,
     running: !!f.running,
     endsAt: +f.endsAt || 0,
+    startedAt: +f.startedAt || 0,
   };
 }
 
@@ -1497,13 +1889,14 @@ async function ensureNotifyPerm() {
   return false;
 }
 
-function startFocus(taskId, taskText, goalTitle, minutes) {
+function startFocus(taskId, taskText, goalTitle, minutes, goalId) {
   const totalSec = Math.round(minutes * 60);
   if (state.focus) stopFocus(true);
   state.focus = {
-    taskId, taskText, goal: goalTitle || "",
+    taskId, taskText, goal: goalTitle || "", goalId: goalId || null,
     totalSec, remainingSec: totalSec, running: true,
     endsAt: Date.now() + totalSec * 1000,
+    startedAt: Date.now(),
   };
   save();
   clearInterval(focusTimerId);
@@ -1519,6 +1912,10 @@ function tickFocus() {
   f.remainingSec = left;
   const timeEl = document.getElementById("focusTime");
   if (timeEl) timeEl.textContent = fmtClock(left);
+  const sideEl = document.getElementById("sidebarFocusTime");
+  if (sideEl) sideEl.textContent = fmtClock(left);
+  const overEl = document.getElementById("focusOverlayTime");
+  if (overEl) overEl.textContent = fmtClock(left);
   document.querySelectorAll(".lock-time").forEach((n) => { n.textContent = fmtClock(left); });
   if (left <= 0) completeFocus();
 }
@@ -1584,24 +1981,39 @@ function chime() {
 function renderFocusBar() {
   const bar = document.getElementById("focusBar");
   const f = state.focus;
-  if (!f) { bar.hidden = true; return; }
+  const side = document.getElementById("sidebarFocus");
+  if (!f) {
+    bar.hidden = true;
+    if (side) side.hidden = true;
+    closeFocusOverlay();
+    return;
+  }
   bar.hidden = false;
   document.getElementById("focusTaskName").textContent = f.taskText;
   document.getElementById("focusGoalName").textContent = f.goal || "Focus session";
   document.getElementById("focusTime").textContent = fmtClock(f.remainingSec);
   document.getElementById("focusPauseBtn").textContent = f.running ? "⏸️" : "▶️";
+  if (side) {
+    side.hidden = false;
+    document.getElementById("sidebarFocusName").textContent = f.taskText;
+    document.getElementById("sidebarFocusTime").textContent = fmtClock(f.remainingSec);
+  }
+  if (!document.getElementById("focusOverlay").hidden) renderFocusOverlay();
 }
 
 function toggleTimerPop(li, task, goalTitle) {
   const old = li.querySelector(":scope > .timer-pop");
   if (old) { old.remove(); return; }
+  const found = findTask(task.id);
+  const goalId = found ? found.goal.id : null;
   const pop = el("div", "timer-pop");
   [15, 25, 45, 60].forEach((m) => {
     const b = el("button", "timer-chip", m + "m");
     b.type = "button";
     b.addEventListener("click", async () => {
       await ensureNotifyPerm();
-      startFocus(task.id, task.text, goalTitle, m);
+      startFocus(task.id, task.text, goalTitle, m, goalId);
+      openFocusOverlay();
     });
     pop.appendChild(b);
   });
@@ -1615,7 +2027,8 @@ function toggleTimerPop(li, task, goalTitle) {
     const m = Math.min(180, Math.max(1, parseInt(inp.value, 10) || 0));
     if (!m) { toast("Enter minutes first"); return; }
     await ensureNotifyPerm();
-    startFocus(task.id, task.text, goalTitle, m);
+    startFocus(task.id, task.text, goalTitle, m, goalId);
+    openFocusOverlay();
   });
   custom.append(inp, go);
   pop.appendChild(custom);
@@ -1745,6 +2158,7 @@ document.getElementById("importFile").addEventListener("change", (e) => {
   rd.onload = () => {
     try {
       const text = String(rd.result || "");
+      if (tryImportTaskbreakerJSON(text)) { e.target.value = ""; return; }
       let items;
       if (/\.json$/i.test(f.name)) {
         const arr = JSON.parse(text);
@@ -1764,6 +2178,7 @@ document.getElementById("importFile").addEventListener("change", (e) => {
 
 document.getElementById("pasteImportBtn").addEventListener("click", () => {
   const ta = document.getElementById("pasteImport");
+  if (ta.value.trim() && tryImportTaskbreakerJSON(ta.value.trim())) { ta.value = ""; return; }
   const lines = ta.value.split("\n").map((l) => l.trim()).filter(Boolean);
   const items = lines.map((l) => {
     const clean = l.replace(/^[-*•\d.)\]]\s+/, "");
@@ -1882,7 +2297,9 @@ function analyzePath() {
     lock.type = "button";
     lock.addEventListener("click", async () => {
       await ensureNotifyPerm();
-      startFocus(c.kind === "task" ? c.ref.id : "import:" + c.ref.id, c.title, c.goal, 25);
+      const fnd = c.kind === "task" ? findTask(c.ref.id) : null;
+      startFocus(c.kind === "task" ? c.ref.id : "import:" + c.ref.id, c.title, c.goal, 25, fnd ? fnd.goal.id : null);
+      openFocusOverlay();
     });
     acts.appendChild(lock);
     li.append(body, acts);
@@ -1992,8 +2409,17 @@ function detailNode(task) {
     save(); renderAll(); renderTaskModal();
   });
   const span = el("span", "task-text", task.text);
+  span.title = "Click to rename";
+  span.addEventListener("click", () => startInlineRename(row, task.text, (next) => {
+    task.text = next;
+    save(); renderAll(); renderTaskModal();
+  }, "span"));
   if (taskDone(task)) li.classList.add("done");
   row.append(check, span);
+  (task.tags || []).forEach((tg) => {
+    const chip = el("span", "tag-chip static", "@" + tg);
+    row.appendChild(chip);
+  });
 
   const addBtn = setIcon(el("button", "icon-btn"), "plus", 13);
   addBtn.type = "button";
@@ -2088,6 +2514,59 @@ function renderTaskModal() {
   } else {
     body.appendChild(el("p", "empty-note", "No subtasks yet — break it down below."));
   }
+
+  /* v6: title rename, tags editor, pin state, suggest box reset, move selects */
+  const titleEl = document.getElementById("taskModalTitle");
+  titleEl.title = "Click to rename";
+  titleEl.onclick = () => startInlineRename(titleEl.parentElement, task.text, (next) => {
+    task.text = next;
+    save(); renderAll(); renderTaskModal();
+  }, "h3");
+
+  const tagsBox = document.getElementById("taskModalTags");
+  tagsBox.innerHTML = "";
+  const tagsLabel = el("span", "tags-label", "Tags");
+  tagsBox.appendChild(tagsLabel);
+  (task.tags || []).forEach((tg) => {
+    const chip = el("span", "tag-chip static", "@" + tg);
+    const rm = el("button", "tag-x", "×");
+    rm.type = "button";
+    rm.setAttribute("aria-label", "Remove tag " + tg);
+    rm.addEventListener("click", () => {
+      task.tags = task.tags.filter((x) => x !== tg);
+      save(); renderAll(); renderTaskModal();
+    });
+    chip.appendChild(rm);
+    tagsBox.appendChild(chip);
+  });
+  const tagForm = el("form", "tag-form");
+  const tagInput = el("input");
+  tagInput.type = "text";
+  tagInput.placeholder = "Add @tag…";
+  tagInput.maxLength = 30;
+  tagInput.autocomplete = "off";
+  const tagAdd = el("button", "btn btn-secondary btn-sm", "Add");
+  tagAdd.type = "submit";
+  tagForm.append(tagInput, tagAdd);
+  tagForm.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const parsed = parseTags(tagInput.value);
+    const add = parsed.tags.length ? parsed.tags : (parsed.text ? [parsed.text.toLowerCase().replace(/\s+/g, "-")] : []);
+    if (!add.length) return;
+    task.tags = [...new Set([...(task.tags || []), ...add])].slice(0, 6);
+    save(); renderAll(); renderTaskModal();
+  });
+  tagsBox.appendChild(tagForm);
+
+  const pinBtn = document.getElementById("pinBtn");
+  pinBtn.innerHTML = icon("pin", 13) + (task.pinned ? " Pinned as priority" : " Pin as priority");
+  pinBtn.classList.toggle("active", !!task.pinned);
+
+  const sb2 = document.getElementById("suggestBox");
+  sb2.hidden = true;
+  sb2.innerHTML = "";
+
+  fillMoveSelects(task, goal);
 }
 
 document.getElementById("taskModalClose").addEventListener("click", closeTaskModal);
@@ -2117,9 +2596,10 @@ document.getElementById("taskModalForm").addEventListener("submit", (e) => {
   const found = findTask(modalTaskId);
   if (!found) return;
   const input = document.getElementById("taskModalInput");
-  const text = input.value.trim();
-  if (!text) return;
-  found.task.subtasks.push({ id: uid(), text, done: false, deadline: null, subtasks: [] });
+  const raw = input.value.trim();
+  if (!raw) return;
+  const parsed = parseTags(raw);
+  found.task.subtasks.push(normalizeTask({ text: parsed.text || raw, tags: parsed.tags }));
   input.value = "";
   save(); renderAll(); renderTaskModal();
   input.focus();
@@ -2287,6 +2767,1114 @@ function startTaskDrag(e, li, ul, items) {
   document.addEventListener("keydown", onKey, true);
 }
 
+/* ================================================================
+   ======================= TASK BREAKER v6 ========================
+   Collapsible cards/sections, FAB + mobile bar, protocols, @tags,
+   priority pins, calendar view, vision board, onboarding, suggest
+   breakdown, task moving, sharing, textures, lock-in overlay.
+   ================================================================ */
+
+/* ---------- shared v6 ui state (not persisted) ---------- */
+let dashFilter = null;        /* category id from a clicked wheel */
+let tagFilter = null;         /* active @tag filter */
+const collapsedGoals = new Set();
+const collapsedCats = new Set();
+let calCursor = null;         /* {y, m} shown in the calendar view */
+
+/* ---------- small shared helpers ---------- */
+
+function downloadFile(name, content, type) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([content], { type: type || "text/plain" }));
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+}
+
+function shareText(title, text) {
+  if (navigator.share) {
+    navigator.share({ title, text }).catch(() => {});
+    return;
+  }
+  const done = () => toast("Copied to clipboard");
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, done));
+  } else fallbackCopy(text, done);
+}
+function fallbackCopy(text, done) {
+  const ta = document.createElement("textarea");
+  ta.value = text;
+  ta.style.position = "fixed";
+  ta.style.opacity = "0";
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand("copy"); done(); } catch (e) { toast("Copy failed — long-press to copy", "warning"); }
+  ta.remove();
+}
+
+/* inline rename: swaps a text node for an input, commits on blur/Enter.
+   host: element the editor is appended to; current: current text;
+   commit(next): called with the trimmed new value (skipped if empty).
+   The original node is hidden while editing and restored after. */
+function startInlineRename(host, current, commit, tagName) {
+  if (!host || host.querySelector(":scope > .inline-edit")) return;
+  const tag = tagName || "span";
+  let target = null;
+  [...host.children].forEach((c) => {
+    if (!target && c.tagName && c.tagName.toLowerCase() === tag.toLowerCase() && !c.classList.contains("inline-edit")) target = c;
+  });
+  const input = el("input", "inline-edit");
+  input.type = "text";
+  input.value = current || "";
+  input.maxLength = 200;
+  input.setAttribute("aria-label", "Rename");
+  if (target) target.style.display = "none";
+  host.appendChild(input);
+  input.focus();
+  input.select();
+  let finished = false;
+  const finish = (saveIt) => {
+    if (finished) return;
+    finished = true;
+    const next = input.value.trim();
+    input.remove();
+    if (target) target.style.display = "";
+    if (saveIt && next) commit(next);
+  };
+  input.addEventListener("blur", () => finish(true));
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); finish(true); }
+    if (e.key === "Escape") finish(false);
+    e.stopPropagation();
+  });
+  input.addEventListener("click", (e) => e.stopPropagation());
+}
+
+/* ---------- @tags ---------- */
+
+function parseTags(raw) {
+  const tags = [];
+  const text = String(raw || "").replace(/@([\p{L}\p{N}_-]+)/gu, (m, w) => {
+    const t = w.toLowerCase();
+    if (!tags.includes(t)) tags.push(t);
+    return "";
+  }).replace(/\s+/g, " ").trim();
+  return { text, tags: tags.slice(0, 6) };
+}
+
+function taskHasTagDeep(t, tag) {
+  if ((t.tags || []).includes(tag)) return true;
+  return (t.subtasks || []).some((st) => taskHasTagDeep(st, tag));
+}
+function filterTasksByTag(tasks, tag) {
+  const out = [];
+  (tasks || []).forEach((t) => {
+    if ((t.tags || []).includes(tag)) { out.push(t); return; }
+    const kids = filterTasksByTag(t.subtasks, tag);
+    if (kids.length) out.push({ ...t, subtasks: kids });
+  });
+  return out;
+}
+
+/* ---------- bulk check / uncheck (one undo step) ---------- */
+
+function setAllLeaves(goal, done) {
+  let changed = 0;
+  const walk = (list) => (list || []).forEach((t) => {
+    if (t.subtasks && t.subtasks.length) walk(t.subtasks);
+    else if (t.done !== done) { t.done = done; changed++; }
+  });
+  walk(goal.tasks);
+  if (!changed) { toast(done ? "Everything is already checked" : "Nothing to uncheck"); return; }
+  if (done) awardXP(Math.min(changed * 10, 100));
+  else save();
+  renderAll();
+  toast((done ? "Checked all" : "Unchecked all") + " in " + goal.title + " — " + undoHint());
+}
+
+/* ---------- priority list (dashboard) ---------- */
+
+function collectPriority() {
+  const out = [];
+  state.goals.forEach((g) => {
+    const walk = (t) => {
+      const info = deadlineInfo(t.deadline);
+      const urgent = info && !taskDone(t) && (info.cls === "due-over" || info.cls === "due-soon");
+      if (!taskDone(t) && (t.pinned || urgent)) {
+        out.push({ task: t, goal: g, info, pinned: !!t.pinned });
+      }
+      (t.subtasks || []).forEach(walk);
+    };
+    g.tasks.forEach(walk);
+  });
+  out.sort((a, b) => {
+    const rank = (x) => (x.info && x.info.cls === "due-over" ? 0 : x.pinned && !(x.info && x.info.cls) ? 1 : 2);
+    const d = rank(a) - rank(b);
+    if (d) return d;
+    const da = a.info ? a.info.diff : 99, db = b.info ? b.info.diff : 99;
+    return da - db;
+  });
+  return out.slice(0, 8);
+}
+
+function renderPriority() {
+  const wrap = document.getElementById("priorityWrap");
+  if (!wrap) return;
+  wrap.innerHTML = "";
+  const items = collectPriority();
+  if (!items.length) return;
+  const card = el("article", "card priority-card");
+  const h = el("h3");
+  h.innerHTML = icon("pin", 16) + " Priority";
+  card.appendChild(h);
+  const ul = el("ul", "priority-list");
+  items.forEach(({ task, goal, info }) => {
+    const li = el("li", "priority-item");
+    const check = el("input", "task-check");
+    check.type = "checkbox";
+    check.checked = false;
+    check.setAttribute("aria-label", task.text);
+    check.addEventListener("change", () => {
+      const gained = toggleTask(task);
+      if (gained) awardXP(gained * 10); else save();
+      renderAll();
+    });
+    const span = el("span", "task-text task-open", task.text);
+    span.addEventListener("click", () => openTaskModal(task.id));
+    li.append(check, span);
+    if (task.pinned) {
+      const p = el("span", "pin-mark");
+      p.innerHTML = icon("pin", 12);
+      li.appendChild(p);
+    }
+    if (info) li.appendChild(el("span", "badge " + info.cls, info.text));
+    li.appendChild(el("span", "priority-goal", goal.title));
+    ul.appendChild(li);
+  });
+  card.appendChild(ul);
+  wrap.appendChild(card);
+}
+
+/* ---------- sharing goals (stand-in for group goals) ---------- */
+
+function goalToText(goal) {
+  const lines = ["Goal: " + goal.title, "Category: " + catOf(goal.category).name];
+  if (goal.timeline) lines.push("Timeline: " + goal.timeline);
+  const walk = (list, depth) => (list || []).forEach((t) => {
+    lines.push("  ".repeat(depth) + (taskDone(t) ? "[x] " : "[ ] ") + t.text +
+      ((t.tags || []).length ? " " + t.tags.map((x) => "@" + x).join(" ") : ""));
+    walk(t.subtasks, depth + 1);
+  });
+  walk(goal.tasks, 0);
+  lines.push("", "— shared from Task Breaker");
+  return lines.join("\n");
+}
+
+function shareGoal(goal) {
+  shareText("Task Breaker goal: " + goal.title, goalToText(goal));
+}
+
+function goalToJSON(goal) {
+  return JSON.stringify({
+    taskbreaker: "goal", version: 6,
+    goal: {
+      title: goal.title, category: goal.category, kind: goal.kind || "goal",
+      timeline: goal.timeline || "", deadline: goal.deadline || null,
+      color: goal.color || null, icon: goal.icon || "target",
+      tasks: goal.tasks,
+    },
+  }, null, 2);
+}
+
+function importSharedGoal(obj) {
+  const g = obj && obj.goal ? obj.goal : obj;
+  if (!g || !g.title) return false;
+  state.goals.push(normalizeGoal({
+    icon: g.icon || "target", title: String(g.title).slice(0, 80),
+    timeline: g.timeline || "", deadline: g.deadline || null,
+    category: g.category, kind: g.kind, color: g.color, tasks: g.tasks || [],
+  }));
+  return true;
+}
+
+/* intercepts Task Breaker share payloads (goal / protocol / note JSON)
+   in the Connections importers. Returns true when handled. */
+function tryImportTaskbreakerJSON(text) {
+  let parsed;
+  try { parsed = JSON.parse(text); } catch (e) { return false; }
+  if (!parsed || typeof parsed !== "object" || !parsed.taskbreaker) return false;
+  if (parsed.taskbreaker === "goal" && importSharedGoal(parsed)) {
+    save(); renderAll();
+    toast("Shared goal imported: " + parsed.goal.title, "success");
+    return true;
+  }
+  if (parsed.taskbreaker === "protocol" && parsed.protocol) {
+    state.protocols.unshift(normalizeProtocol(parsed.protocol));
+    save(); renderProtocols();
+    toast("Protocol imported: " + parsed.protocol.name, "success");
+    return true;
+  }
+  if (parsed.taskbreaker === "note" && parsed.note) {
+    state.notes.unshift({
+      id: uid(), title: String(parsed.note.title || ""), body: String(parsed.note.body || ""),
+      color: parsed.note.color && GOAL_COLORS[parsed.note.color] ? parsed.note.color : null,
+    });
+    save(); renderNotes();
+    toast("Note imported", "success");
+    return true;
+  }
+  return false;
+}
+
+/* ---------- protocols ---------- */
+
+function saveGoalAsProtocol(goal) {
+  const items = [];
+  const walk = (list, depth) => (list || []).forEach((t) => {
+    items.push("  ".repeat(depth) + t.text);
+    walk(t.subtasks, depth + 1);
+  });
+  walk(goal.tasks, 0);
+  if (!items.length) { toast("Add some tasks first, then save as a protocol", "warning"); return; }
+  state.protocols.unshift(normalizeProtocol({ name: goal.title, items, created: new Date().toISOString() }));
+  save(); renderProtocols();
+  toast("Protocol saved: " + goal.title);
+}
+
+function useProtocol(p, category) {
+  const tasks = [];
+  let stack = [{ children: tasks, depth: -1 }];
+  (p.items || []).forEach((line) => {
+    const m = String(line).match(/^(\s*)/);
+    const depth = Math.min(3, Math.floor((m ? m[1].length : 0) / 2));
+    const node = normalizeTask({ text: String(line).trim() });
+    while (stack.length && stack[stack.length - 1].depth >= depth) stack.pop();
+    (stack.length ? stack[stack.length - 1].children : tasks).push(node);
+    stack.push({ children: node.subtasks, depth });
+  });
+  state.goals.push(normalizeGoal({
+    icon: "target", title: p.name, timeline: "", category: category || "personal", tasks,
+  }));
+  save(); renderAll();
+  goToPage("dashboard");
+  toast("Protocol started as a new goal: " + p.name, "success");
+}
+
+/* protocol items are plain strings, so they get their own drag logic:
+   on drag end the DOM order is written back into the items array. */
+function makeProtocolSortable(ul, items) {
+  let dragLi = null;
+  ul.querySelectorAll(":scope > li").forEach((li) => {
+    const grip = li.querySelector(".drag-handle");
+    if (!grip) return;
+    grip.addEventListener("pointerdown", () => { li.draggable = true; });
+    li.addEventListener("dragstart", (e) => {
+      dragLi = li;
+      li.classList.add("dragging");
+      if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
+    });
+    li.addEventListener("dragend", () => {
+      li.classList.remove("dragging");
+      li.draggable = false;
+      const order = [...ul.querySelectorAll(":scope > li")].map((n) => n._lineRef);
+      items.length = 0;
+      order.forEach((l) => items.push(l));
+      save();
+      renderProtocols();
+      toast("Protocol reordered — " + undoHint());
+    });
+    li.addEventListener("dragover", (e) => {
+      if (!dragLi || dragLi === li) return;
+      e.preventDefault();
+      const rect = li.getBoundingClientRect();
+      const after = (e.clientY - rect.top) > rect.height / 2;
+      ul.insertBefore(dragLi, after ? li.nextSibling : li);
+    });
+  });
+  ul.querySelectorAll(":scope > li").forEach((li, i) => { li._lineRef = items[i]; });
+}
+
+function renderProtocols() {
+  const wrap = document.getElementById("protocolList");
+  if (!wrap) return;
+  wrap.innerHTML = "";
+  if (!state.protocols.length) {
+    const c = el("article", "card");
+    c.appendChild(el("p", "empty-note", "No protocols yet. Save one from a goal card, or write a checklist above."));
+    wrap.appendChild(c);
+    return;
+  }
+  state.protocols.forEach((p) => {
+    const card = el("article", "card protocol-card");
+    const top = el("div", "protocol-top");
+    const nameEl = el("h3", null, p.name);
+    nameEl.title = "Click to rename";
+    nameEl.addEventListener("click", () => startInlineRename(top, p.name, (next) => {
+      p.name = next;
+      save(); renderProtocols();
+    }, "h3"));
+    top.appendChild(nameEl);
+    const del = setIcon(el("button", "icon-btn"), "x", 14);
+    del.type = "button";
+    del.setAttribute("aria-label", "Delete protocol");
+    del.addEventListener("click", async () => {
+      const r = await confirmAction({
+        title: "Delete this protocol?",
+        message: "\u201C" + p.name + "\u201D will be permanently deleted.",
+        confirmText: "Delete protocol",
+      });
+      if (!r.result) return;
+      state.protocols = state.protocols.filter((x) => x.id !== p.id);
+      save(); renderProtocols();
+    });
+    top.appendChild(del);
+    card.appendChild(top);
+
+    const ul = el("ul", "protocol-items");
+    (p.items || []).forEach((line, idx) => {
+      const depth = Math.min(3, Math.floor(line.match(/^(\s*)/)[1].length / 2));
+      const li = el("li");
+      li.style.marginLeft = (depth * 18) + "px";
+      const grip = setIcon(el("span", "drag-handle"), "grip-vertical", 13);
+      grip.title = "Drag to reorder";
+      li.appendChild(grip);
+      const span = el("span", "task-text", line.trim());
+      span.title = "Click to edit";
+      span.addEventListener("click", () => startInlineRename(li, line.trim(), (next) => {
+        p.items[idx] = "  ".repeat(depth) + next;
+        save(); renderProtocols();
+      }));
+      li.appendChild(span);
+      const x = setIcon(el("button", "task-del"), "x", 12);
+      x.type = "button";
+      x.setAttribute("aria-label", "Remove step");
+      x.addEventListener("click", () => {
+        p.items.splice(idx, 1);
+        save(); renderProtocols();
+      });
+      li.appendChild(x);
+      ul.appendChild(li);
+    });
+    makeProtocolSortable(ul, p.items);
+    card.appendChild(ul);
+
+    const addForm = el("form", "add-task");
+    const addInput = el("input");
+    addInput.type = "text";
+    addInput.placeholder = "Add a step…";
+    addInput.maxLength = 120;
+    addInput.autocomplete = "off";
+    const addBtn = el("button", "btn btn-primary", "+");
+    addBtn.type = "submit";
+    addForm.append(addInput, addBtn);
+    addForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const v = addInput.value.trim();
+      if (!v) return;
+      p.items.push(v);
+      save(); renderProtocols();
+    });
+    card.appendChild(addForm);
+
+    const row = el("div", "protocol-use-row");
+    const sel = el("select");
+    sel.setAttribute("aria-label", "Category for the new goal");
+    CATEGORIES.forEach((c) => {
+      const o = el("option", null, c.name);
+      o.value = c.id;
+      sel.appendChild(o);
+    });
+    sel.value = "personal";
+    const use = el("button", "btn btn-primary btn-sm");
+    use.type = "button";
+    use.innerHTML = icon("play-fill", 13) + " Use protocol";
+    use.addEventListener("click", () => useProtocol(p, sel.value));
+    const share = el("button", "btn btn-secondary btn-sm");
+    share.type = "button";
+    share.innerHTML = icon("share", 13) + " Share";
+    share.addEventListener("click", () => {
+      shareText("Task Breaker protocol: " + p.name,
+        "Protocol: " + p.name + "\n" + (p.items || []).map((i) => "☐ " + i.trim()).join("\n") + "\n\n— shared from Task Breaker");
+    });
+    const dl = el("button", "btn btn-secondary btn-sm");
+    dl.type = "button";
+    dl.innerHTML = icon("download", 13) + " JSON";
+    dl.addEventListener("click", () => {
+      downloadFile(p.name.replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "-").toLowerCase() + "-protocol.json",
+        JSON.stringify({ taskbreaker: "protocol", version: 6, protocol: p }, null, 2), "application/json");
+    });
+    row.append(sel, use, share, dl);
+    card.appendChild(row);
+    wrap.appendChild(card);
+  });
+}
+
+document.getElementById("addProtocolBtn").addEventListener("click", () => {
+  const name = document.getElementById("protocolName").value.trim();
+  const items = document.getElementById("protocolItems").value.split("\n").map((l) => l.trim()).filter(Boolean);
+  if (!name) { document.getElementById("protocolName").focus(); return; }
+  if (!items.length) { document.getElementById("protocolItems").focus(); toast("Add at least one checklist step", "warning"); return; }
+  state.protocols.unshift(normalizeProtocol({ name, items, created: new Date().toISOString() }));
+  document.getElementById("protocolName").value = "";
+  document.getElementById("protocolItems").value = "";
+  save(); renderProtocols();
+  toast("Protocol saved");
+});
+
+/* ---------- vision board ---------- */
+
+function renderVision() {
+  const grid = document.getElementById("visionGrid");
+  if (!grid) return;
+  grid.innerHTML = "";
+  if (!state.vision.length) {
+    grid.appendChild(el("p", "empty-note", "Your board is empty. Add your first image card above."));
+    return;
+  }
+  state.vision.forEach((v) => {
+    const card = el("figure", "vision-card");
+    const img = el("img");
+    img.src = v.url;
+    img.alt = v.caption || "Vision board image";
+    img.loading = "lazy";
+    img.addEventListener("error", () => card.classList.add("vision-broken"));
+    card.appendChild(img);
+    const cap = el("figcaption", null, v.caption || "");
+    cap.title = "Click to edit caption";
+    cap.addEventListener("click", () => startInlineRename(card, v.caption, (next) => {
+      v.caption = next;
+      save(); renderVision();
+    }, "figcaption"));
+    card.appendChild(cap);
+    const x = setIcon(el("button", "icon-btn vision-x"), "x", 13);
+    x.type = "button";
+    x.setAttribute("aria-label", "Remove vision card");
+    x.addEventListener("click", () => {
+      state.vision = state.vision.filter((o) => o.id !== v.id);
+      save(); renderVision();
+    });
+    card.appendChild(x);
+    grid.appendChild(card);
+  });
+}
+
+document.getElementById("addVisionBtn").addEventListener("click", () => {
+  const urlInput = document.getElementById("visionUrl");
+  const capInput = document.getElementById("visionCaption");
+  const url = urlInput.value.trim();
+  if (!/^https?:\/\//i.test(url)) { urlInput.focus(); toast("Paste a full image URL (https://…)", "warning"); return; }
+  state.vision.unshift({ id: uid(), url, caption: capInput.value.trim() });
+  urlInput.value = "";
+  capInput.value = "";
+  save(); renderVision();
+  toast("Added to your vision board");
+});
+
+/* ---------- calendar view ---------- */
+
+function calNavigate(delta) {
+  if (!calCursor) {
+    const n = new Date();
+    calCursor = { y: n.getFullYear(), m: n.getMonth() };
+  }
+  calCursor.m += delta;
+  if (calCursor.m < 0) { calCursor.m = 11; calCursor.y--; }
+  if (calCursor.m > 11) { calCursor.m = 0; calCursor.y++; }
+  renderCalendar();
+}
+document.getElementById("calPrev").addEventListener("click", () => calNavigate(-1));
+document.getElementById("calNext").addEventListener("click", () => calNavigate(1));
+document.getElementById("calToday").addEventListener("click", () => { calCursor = null; renderCalendar(); });
+
+function calItemStatus(item) {
+  if (item.done) return "done";
+  const info = deadlineInfo(item.deadline);
+  if (!info) return "";
+  if (info.cls === "due-over") return "due-over";
+  if (info.cls === "due-soon") return "due-soon";
+  return "";
+}
+
+function renderCalendar() {
+  const grid = document.getElementById("calGrid");
+  if (!grid) return;
+  const now = new Date();
+  if (!calCursor) calCursor = { y: now.getFullYear(), m: now.getMonth() };
+  const { y, m } = calCursor;
+  document.getElementById("calTitle").textContent =
+    new Date(y, m, 1).toLocaleDateString(undefined, { month: "long", year: "numeric" });
+
+  const items = collectDeadlinesFull();
+  const byDay = new Map();
+  items.forEach((it) => {
+    if (!byDay.has(it.deadline)) byDay.set(it.deadline, []);
+    byDay.get(it.deadline).push(it);
+  });
+
+  grid.innerHTML = "";
+  const first = new Date(y, m, 1);
+  const lead = (first.getDay() + 6) % 7; /* Monday-first */
+  const daysInMonth = new Date(y, m + 1, 0).getDate();
+  const todayKey = dayKey(now);
+  for (let i = 0; i < lead; i++) grid.appendChild(el("div", "cal-cell empty"));
+  for (let d = 1; d <= daysInMonth; d++) {
+    const key = y + "-" + String(m + 1).padStart(2, "0") + "-" + String(d).padStart(2, "0");
+    const cell = el("div", "cal-cell" + (key === todayKey ? " today" : ""));
+    cell.appendChild(el("span", "cal-daynum", String(d)));
+    (byDay.get(key) || []).slice(0, 3).forEach((it) => {
+      const chip = el("button", "cal-chip " + calItemStatus(it), it.text);
+      chip.type = "button";
+      chip.title = it.text + (it.goalTitle ? " — " + it.goalTitle : "");
+      chip.addEventListener("click", () => openCalItem(it));
+      cell.appendChild(chip);
+    });
+    const extra = (byDay.get(key) || []).length - 3;
+    if (extra > 0) cell.appendChild(el("span", "cal-more", "+" + extra + " more"));
+    grid.appendChild(cell);
+  }
+
+  const listWrap = document.getElementById("calList");
+  listWrap.innerHTML = "";
+  const monthItems = items
+    .filter((it) => it.deadline.startsWith(y + "-" + String(m + 1).padStart(2, "0")))
+    .sort((a, b) => a.deadline.localeCompare(b.deadline));
+  if (!monthItems.length) {
+    listWrap.appendChild(el("p", "empty-note", "No deadlines this month."));
+    return;
+  }
+  const card = el("article", "card");
+  const ul = el("ul", "check-list");
+  monthItems.forEach((it) => {
+    const li = el("li", "cal-list-item");
+    const dot = el("span", "cal-dot " + (calItemStatus(it) || "plain"));
+    li.appendChild(dot);
+    const span = el("span", "task-text task-open", it.text);
+    span.addEventListener("click", () => openCalItem(it));
+    li.appendChild(span);
+    li.appendChild(el("span", "cal-list-date", it.deadline));
+    if (it.goalTitle) li.appendChild(el("span", "cal-list-goal", it.goalTitle));
+    ul.appendChild(li);
+  });
+  card.appendChild(ul);
+  listWrap.appendChild(card);
+}
+
+/* deadlines with live references, for the calendar view */
+function collectDeadlinesFull() {
+  const out = [];
+  const walk = (t, goal) => {
+    if (t.deadline) out.push({ text: t.text, deadline: t.deadline, done: taskDone(t), goalTitle: goal.title, taskId: t.id, goalId: null });
+    (t.subtasks || []).forEach((st) => walk(st, goal));
+  };
+  state.goals.forEach((g) => {
+    if (g.deadline) out.push({ text: g.title, deadline: g.deadline, done: goalProgress(g) === 100, goalTitle: null, taskId: null, goalId: g.id });
+    g.tasks.forEach((t) => walk(t, g));
+  });
+  return out;
+}
+
+function openCalItem(it) {
+  if (it.taskId) { goToPage("dashboard"); openTaskModal(it.taskId); }
+  else goToPage("dashboard");
+}
+
+/* ---------- suggest a breakdown (Pathfinder templates) ---------- */
+
+const BREAKDOWN_TEMPLATES = [
+  { keys: ["website", "web site", "landing page", "portfolio site", "webpage"], steps: ["Define the goal and audience", "Sketch the page layout", "Write the copy", "Pick colors, type and images", "Build the first version", "Test on mobile", "Fix issues and polish", "Publish and share the link"] },
+  { keys: ["trip", "travel", "vacation", "flight", "holiday"], steps: ["Pick dates and budget", "Book flights or transport", "Book where you'll stay", "List what to see and do", "Pack a checklist", "Download offline maps and tickets"] },
+  { keys: ["study", "course", "learn", "exam", "class", "tutorial"], steps: ["Gather the material", "Split it into small topics", "Study topic one", "Take notes in your own words", "Practice with exercises", "Review and mark what's left"] },
+  { keys: ["job", "apply", "application", "interview", "resume", "cv"], steps: ["Read the posting carefully", "Tailor the resume", "Write a short cover note", "Submit the application", "Prepare talking points", "Follow up in one week"] },
+  { keys: ["event", "party", "birthday", "meetup", "wedding"], steps: ["Pick the date and place", "Make the guest list", "Send invitations", "Plan food and drinks", "Prepare music and setup", "Confirm everything the day before"] },
+  { keys: ["video", "reel", "youtube", "film"], steps: ["Write the hook (first 3 seconds)", "Outline the shots", "Record the footage", "Edit the rough cut", "Add captions and music", "Export and post"] },
+  { keys: ["design", "logo", "brand", "poster", "banner"], steps: ["Collect references", "Sketch 3 rough directions", "Pick one and build it", "Get feedback", "Refine details", "Export final files"] },
+];
+const GENERIC_BREAKDOWN = ["Write down what done looks like", "List the materials you need", "Do the first small step", "Do the main work", "Review and fix", "Finish and share"];
+
+function suggestBreakdownFor(text) {
+  const t = " " + String(text || "").toLowerCase() + " ";
+  for (const tpl of BREAKDOWN_TEMPLATES) {
+    if (tpl.keys.some((k) => t.includes(k))) return tpl.steps.slice();
+  }
+  return GENERIC_BREAKDOWN.slice();
+}
+
+document.getElementById("suggestBtn").addEventListener("click", () => {
+  const found = findTask(modalTaskId);
+  if (!found) return;
+  const box = document.getElementById("suggestBox");
+  const steps = suggestBreakdownFor(found.task.text);
+  box.innerHTML = "";
+  box.hidden = false;
+  const h = el("h4");
+  h.innerHTML = icon("magic", 14) + " Suggested breakdown";
+  box.appendChild(h);
+  const p = el("p", "fine-print", "From Pathfinder's on-device templates. Untick anything you don't need, then add the rest as subtasks.");
+  p.style.margin = "0 0 10px";
+  box.appendChild(p);
+  const checks = [];
+  steps.forEach((s) => {
+    const label = el("label", "suggest-row");
+    const cb = el("input");
+    cb.type = "checkbox";
+    cb.checked = true;
+    label.append(cb, el("span", null, s));
+    box.appendChild(label);
+    checks.push({ cb, text: s });
+  });
+  const row = el("div", "suggest-actions");
+  const add = el("button", "btn btn-primary btn-sm", "Add selected as subtasks");
+  add.type = "button";
+  add.addEventListener("click", () => {
+    const picked = checks.filter((c) => c.cb.checked).map((c) => c.text);
+    if (!picked.length) { toast("Nothing selected"); return; }
+    picked.forEach((text) => found.task.subtasks.push(normalizeTask({ text })));
+    save(); renderAll(); renderTaskModal();
+    toast(picked.length + " subtasks added — " + undoHint(), "success");
+  });
+  const dismiss = el("button", "btn btn-tertiary btn-sm", "Dismiss");
+  dismiss.type = "button";
+  dismiss.addEventListener("click", () => { box.hidden = true; box.innerHTML = ""; });
+  row.append(add, dismiss);
+  box.appendChild(row);
+});
+
+document.getElementById("pinBtn").addEventListener("click", () => {
+  const found = findTask(modalTaskId);
+  if (!found) return;
+  found.task.pinned = !found.task.pinned;
+  save(); renderAll(); renderTaskModal();
+  toast(found.task.pinned ? "Pinned to Priority" : "Removed from Priority");
+});
+
+document.getElementById("shareTaskBtn").addEventListener("click", () => {
+  const found = findTask(modalTaskId);
+  if (!found) return;
+  const lines = ["Task: " + found.task.text, "Goal: " + found.goal.title];
+  const walk = (list, depth) => (list || []).forEach((t) => {
+    lines.push("  ".repeat(depth) + (taskDone(t) ? "[x] " : "[ ] ") + t.text);
+    walk(t.subtasks, depth + 1);
+  });
+  walk(found.task.subtasks, 0);
+  shareText("Task Breaker task", lines.join("\n"));
+});
+
+/* ---------- move tasks ---------- */
+
+function isDescendantOf(candidate, root) {
+  if (!root || !root.subtasks) return false;
+  return root.subtasks.some((st) => st.id === candidate.id || isDescendantOf(candidate, st));
+}
+
+function fillMoveSelects(task, goal) {
+  const goalSel = document.getElementById("moveGoalSel");
+  const parentSel = document.getElementById("moveParentSel");
+  if (!goalSel || !parentSel) return;
+  goalSel.innerHTML = "";
+  state.goals.forEach((g) => {
+    const o = el("option", null, g.title);
+    o.value = g.id;
+    if (g.id === goal.id) o.selected = true;
+    goalSel.appendChild(o);
+  });
+  parentSel.innerHTML = "";
+  const top = el("option", null, "Top level (no parent)");
+  top.value = "";
+  parentSel.appendChild(top);
+  const addOpts = (list, depth, rootGoal) => (list || []).forEach((t) => {
+    if (t.id === task.id || isDescendantOf(t, task)) return;
+    const o = el("option", null, "  ".repeat(depth) + t.text + (rootGoal.id !== goal.id ? " · " + rootGoal.title : ""));
+    o.value = rootGoal.id + "|" + t.id;
+    parentSel.appendChild(o);
+    addOpts(t.subtasks, depth + 1, rootGoal);
+  });
+  state.goals.forEach((g) => addOpts(g.tasks, 0, g));
+}
+
+document.getElementById("moveGoalBtn").addEventListener("click", () => {
+  const found = findTask(modalTaskId);
+  if (!found) return;
+  const target = state.goals.find((g) => g.id === document.getElementById("moveGoalSel").value);
+  if (!target) return;
+  if (target.id === found.goal.id) { toast("Already in that goal"); return; }
+  found.parent.splice(found.index, 1);
+  target.tasks.push(found.task);
+  save(); renderAll();
+  toast("Moved to " + target.title + " — " + undoHint());
+  renderTaskModal();
+});
+
+document.getElementById("moveParentBtn").addEventListener("click", () => {
+  const found = findTask(modalTaskId);
+  if (!found) return;
+  const v = document.getElementById("moveParentSel").value;
+  if (!v) {
+    /* promote to top level of its own goal */
+    const cur = findInTree(found.goal.tasks, modalTaskId);
+    if (cur && cur.parent === found.goal.tasks) { toast("Already top level"); return; }
+    found.parent.splice(found.index, 1);
+    found.goal.tasks.push(found.task);
+    save(); renderAll(); renderTaskModal();
+    toast("Promoted to top level — " + undoHint());
+    return;
+  }
+  const [goalId, parentId] = v.split("|");
+  const parentFound = findTask(parentId);
+  if (!parentFound) return;
+  found.parent.splice(found.index, 1);
+  parentFound.task.subtasks.push(found.task);
+  expandedTasks.add(parentId);
+  save(); renderAll(); renderTaskModal();
+  toast("Moved under " + parentFound.task.text + " — " + undoHint());
+});
+
+/* ---------- lock-in overlay ---------- */
+
+function openFocusOverlay() {
+  const ov = document.getElementById("focusOverlay");
+  if (!ov || !state.focus) return;
+  ov.hidden = false;
+  renderFocusOverlay();
+}
+function closeFocusOverlay() {
+  const ov = document.getElementById("focusOverlay");
+  if (ov) ov.hidden = true;
+}
+
+function focusGoal() {
+  const f = state.focus;
+  if (!f || !f.goalId) return null;
+  return state.goals.find((g) => g.id === f.goalId) || null;
+}
+
+function renderFocusOverlay() {
+  const f = state.focus;
+  if (!f) return;
+  document.getElementById("focusOverlayTask").textContent = f.taskText;
+  document.getElementById("focusOverlayGoal").textContent = f.goal || "";
+  document.getElementById("focusOverlayTime").textContent = fmtClock(f.remainingSec);
+  document.getElementById("focusOverlayPause").textContent = f.running ? "Pause" : "Resume";
+  const goal = focusGoal();
+  const list = document.getElementById("focusChecklist");
+  list.innerHTML = "";
+  if (!goal || !goal.tasks.length) {
+    document.getElementById("focusOverlayHint").textContent = "Stay on this task until the timer ends.";
+    return;
+  }
+  document.getElementById("focusOverlayHint").textContent =
+    "Check off " + goal.title + "'s tasks as you finish them. Finish them all and the session ends early, XP included.";
+  goal.tasks.forEach((t) => {
+    const li = el("li", "focus-check-item" + (taskDone(t) ? " done" : ""));
+    const check = el("input", "task-check");
+    check.type = "checkbox";
+    check.checked = taskDone(t);
+    check.setAttribute("aria-label", t.text);
+    check.addEventListener("change", () => {
+      const gained = toggleTask(t);
+      if (gained) awardXP(gained * 10); else save();
+      renderAll();
+      renderFocusOverlay();
+    });
+    li.append(check, el("span", null, t.text));
+    list.appendChild(li);
+  });
+}
+
+function maybeCompleteFocusByChecklist() {
+  const f = state.focus;
+  if (!f) return;
+  if (f.startedAt && Date.now() - f.startedAt < 3000) return; /* just started */
+  const goal = focusGoal();
+  if (!goal || !goal.tasks.length) return;
+  if (goal.tasks.every(taskDone)) completeFocus();
+}
+
+document.getElementById("focusOpenBtn").addEventListener("click", openFocusOverlay);
+document.getElementById("focusOverlayClose").addEventListener("click", closeFocusOverlay);
+document.getElementById("focusOverlayPause").addEventListener("click", () => { pauseFocus(); renderFocusOverlay(); });
+document.getElementById("focusOverlayDone").addEventListener("click", () => { closeFocusOverlay(); stopFocus(); });
+
+/* ---------- FAB + quick add ---------- */
+
+const fabMenu = document.getElementById("fabMenu");
+const fabMain = document.getElementById("fabMain");
+function closeFab() {
+  fabMenu.hidden = true;
+  fabMain.classList.remove("open");
+  fabMain.setAttribute("aria-expanded", "false");
+}
+fabMain.addEventListener("click", () => {
+  const open = fabMenu.hidden;
+  fabMenu.hidden = !open;
+  fabMain.classList.toggle("open", open);
+  fabMain.setAttribute("aria-expanded", open ? "true" : "false");
+});
+document.addEventListener("click", (e) => {
+  if (!document.getElementById("fabWrap").contains(e.target)) closeFab();
+});
+
+function fabNewGoal() {
+  goToPage("dashboard");
+  const input = document.getElementById("newGoalTitle");
+  input.scrollIntoView({ behavior: "smooth", block: "center" });
+  setTimeout(() => input.focus(), 350);
+}
+function fabFirstGoalTask() {
+  const g = state.goals.find((x) => x.tasks.length || true);
+  if (!g) { toast("Add a goal first"); return null; }
+  return g;
+}
+document.querySelectorAll(".fab-action").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const kind = btn.dataset.fab;
+    closeFab();
+    if (kind === "goal") fabNewGoal();
+    else if (kind === "note") {
+      goToPage("notes");
+      setTimeout(() => document.getElementById("noteTitle").focus(), 350);
+    } else if (kind === "wish") {
+      goToPage("wishlist");
+      setTimeout(() => document.getElementById("wishlistInput").focus(), 350);
+    } else if (kind === "task") {
+      const g = fabFirstGoalTask();
+      if (!g) return;
+      goToPage("dashboard");
+      setTimeout(() => {
+        const card = document.querySelector('[data-goal="' + g.id + '"]');
+        const input = card ? card.querySelector(".add-task input") : null;
+        if (input) { input.scrollIntoView({ behavior: "smooth", block: "center" }); input.focus(); }
+      }, 350);
+    } else if (kind === "focus") {
+      const open = [];
+      state.goals.forEach((g) => g.tasks.forEach((t) => { if (!taskDone(t)) open.push({ t, g }); }));
+      if (!open.length) { toast("No open tasks to focus on"); return; }
+      const { t, g } = open[0];
+      ensureNotifyPerm().then(() => {
+        startFocus(t.id, t.text, g.title, 25, g.id);
+        openFocusOverlay();
+      });
+    }
+  });
+});
+
+/* ---------- appearance: background texture ---------- */
+
+function applyTexture() {
+  const t = (state.settings && state.settings.texture) || "none";
+  document.body.dataset.texture = t;
+}
+document.getElementById("setTexture").addEventListener("change", (e) => {
+  state.settings.texture = e.target.value;
+  save();
+  applyTexture();
+  toast("Background texture: " + e.target.value);
+});
+document.getElementById("setAutoReset").addEventListener("change", (e) => {
+  state.settings.autoResetRoutines = e.target.checked;
+  save();
+  renderRoutines();
+  toast(e.target.checked ? "Routines auto-reset each week" : "Routine checks now carry into the new week");
+});
+
+/* ---------- category names ---------- */
+
+function applyCategoryNames() {
+  if (!state.categories) return;
+  CATEGORIES.forEach((c) => {
+    if (state.categories[c.id]) c.name = String(state.categories[c.id]).slice(0, 24);
+  });
+}
+
+/* ---------- onboarding (conversational, 3 steps) ---------- */
+
+const CORE_PRINCIPLES = [
+  "Reduce the learning curve",
+  "Break down the task",
+  "Have a sense of direction and progress",
+  "Have fun in the process",
+];
+let onboardStep = 0;
+const onboardAnswers = { purpose: "", pillars: {}, goals: ["", "", ""] };
+
+function openOnboarding() {
+  onboardStep = 0;
+  onboardAnswers.purpose = "";
+  onboardAnswers.pillars = {};
+  CATEGORIES.forEach((c) => { onboardAnswers.pillars[c.id] = c.name; });
+  onboardAnswers.goals = ["", "", ""];
+  document.getElementById("onboardOverlay").classList.add("open");
+  document.body.style.overflow = "hidden";
+  renderOnboard();
+}
+function closeOnboarding() {
+  document.getElementById("onboardOverlay").classList.remove("open");
+  document.body.style.overflow = "";
+}
+document.getElementById("rerunOnboardingBtn").addEventListener("click", openOnboarding);
+
+function onboardNav(body, opts) {
+  const row = el("div", "onboard-actions");
+  if (opts.back) {
+    const b = el("button", "btn btn-tertiary", "Back");
+    b.type = "button";
+    b.addEventListener("click", () => { onboardStep--; renderOnboard(); });
+    row.appendChild(b);
+  }
+  const next = el("button", "btn btn-primary", opts.nextLabel || "Continue");
+  next.type = "button";
+  next.addEventListener("click", opts.onNext);
+  row.appendChild(next);
+  if (opts.skippable) {
+    const s = el("button", "btn btn-tertiary", "Skip for now");
+    s.type = "button";
+    s.addEventListener("click", finishOnboarding);
+    row.appendChild(s);
+  }
+  body.appendChild(row);
+}
+
+function renderOnboard() {
+  const dots = document.getElementById("onboardDots");
+  dots.innerHTML = "";
+  for (let i = 0; i < 4; i++) {
+    dots.appendChild(el("span", "onboard-dot" + (i === onboardStep ? " active" : "")));
+  }
+  const body = document.getElementById("onboardBody");
+  body.innerHTML = "";
+
+  if (onboardStep === 0) {
+    body.appendChild(el("h3", "onboard-title", "Welcome to Task Breaker"));
+    body.appendChild(el("p", "onboard-sub", "Big goals feel heavy. Broken down, they move. This app runs on four principles:"));
+    const ul = el("ul", "core-list");
+    CORE_PRINCIPLES.forEach((p) => {
+      const li = el("li");
+      li.appendChild(el("strong", null, p));
+      ul.appendChild(li);
+    });
+    body.appendChild(ul);
+    onboardNav(body, { skippable: true, nextLabel: "Let's go", onNext: () => { onboardStep = 1; renderOnboard(); } });
+    return;
+  }
+
+  if (onboardStep === 1) {
+    body.appendChild(el("h3", "onboard-title", "What is your purpose for using the app?"));
+    body.appendChild(el("p", "onboard-sub", "One sentence is plenty. It stays on your profile as your north star."));
+    const ta = el("textarea", "onboard-input");
+    ta.rows = 3;
+    ta.maxLength = 200;
+    ta.placeholder = "e.g. Land a full-time design job and get my life organized…";
+    ta.value = onboardAnswers.purpose;
+    body.appendChild(ta);
+    onboardNav(body, {
+      back: true, skippable: true,
+      onNext: () => { onboardAnswers.purpose = ta.value.trim(); onboardStep = 2; renderOnboard(); },
+    });
+    setTimeout(() => ta.focus(), 60);
+    return;
+  }
+
+  if (onboardStep === 2) {
+    body.appendChild(el("h3", "onboard-title", "How would you categorize your life right now?"));
+    body.appendChild(el("p", "onboard-sub", "Your main pillars. Rename them to fit your life; the wheels on your dashboard follow these."));
+    CATEGORIES.forEach((c) => {
+      const label = el("label", "onboard-pillar");
+      const ic = el("span", "onboard-pillar-icon");
+      ic.innerHTML = icon(c.icon, 16);
+      label.appendChild(ic);
+      const input = el("input");
+      input.type = "text";
+      input.maxLength = 24;
+      input.value = onboardAnswers.pillars[c.id];
+      input.setAttribute("aria-label", "Pillar name for " + c.id);
+      input.addEventListener("input", () => { onboardAnswers.pillars[c.id] = input.value; });
+      label.appendChild(input);
+      body.appendChild(label);
+    });
+    onboardNav(body, { back: true, skippable: true, onNext: () => { onboardStep = 3; renderOnboard(); } });
+    return;
+  }
+
+  /* step 3: big goals */
+  body.appendChild(el("h3", "onboard-title", "What are your main big goals right now?"));
+  body.appendChild(el("p", "onboard-sub", "Up to three. Each becomes a goal in its pillar, ready to break down. Leave blank to keep what's already on your dashboard."));
+  CATEGORIES.slice(0, 3).forEach((c, i) => {
+    const label = el("label", "onboard-pillar");
+    const ic = el("span", "onboard-pillar-icon");
+    ic.innerHTML = icon(c.icon, 16);
+    label.appendChild(ic);
+    const input = el("input");
+    input.type = "text";
+    input.maxLength = 80;
+    input.placeholder = "A big goal for " + (onboardAnswers.pillars[c.id] || c.name) + "…";
+    input.value = onboardAnswers.goals[i];
+    input.setAttribute("aria-label", "Big goal " + (i + 1));
+    input.addEventListener("input", () => { onboardAnswers.goals[i] = input.value; });
+    label.appendChild(input);
+    body.appendChild(label);
+  });
+  onboardNav(body, {
+    back: true, nextLabel: "Start breaking tasks",
+    onNext: () => {
+      applyOnboarding();
+      finishOnboarding();
+      toast("Welcome aboard — your pillars and goals are set", "success");
+    },
+  });
+}
+
+function applyOnboarding() {
+  const names = {};
+  CATEGORIES.forEach((c) => {
+    const n = (onboardAnswers.pillars[c.id] || "").trim();
+    if (n) names[c.id] = n;
+  });
+  if (Object.keys(names).length) {
+    state.categories = names;
+    applyCategoryNames();
+  }
+  onboardAnswers.goals.forEach((g, i) => {
+    const title = (g || "").trim();
+    if (!title) return;
+    if (state.goals.some((x) => x.title === title)) return;
+    state.goals.push(normalizeGoal({
+      icon: "target", title, timeline: "", category: CATEGORIES[i].id, tasks: [],
+    }));
+  });
+  if (onboardAnswers.purpose) state.purpose = onboardAnswers.purpose;
+}
+
+function finishOnboarding() {
+  state.onboarded = true;
+  save();
+  closeOnboarding();
+  renderAll();
+}
+
+/* ---------- v6 init ---------- */
+
+function collectTaskMeta() {
+  const meta = {};
+  const walk = (list) => (list || []).forEach((t) => {
+    if ((t.tags && t.tags.length) || t.pinned) meta[t.id] = { tags: t.tags || [], pinned: !!t.pinned };
+    walk(t.subtasks);
+  });
+  (state.goals || []).forEach((g) => walk(g.tasks));
+  return meta;
+}
+
+function initV6() {
+  if (!state.settings) state.settings = { autoResetRoutines: true, texture: "none" };
+  if (!Array.isArray(state.protocols)) state.protocols = [];
+  if (!Array.isArray(state.vision)) state.vision = [];
+  if (!Array.isArray(state.reports)) state.reports = [];
+  applyCategoryNames();
+  applyTexture();
+  if (!state.onboarded) {
+    setTimeout(() => { if (!state.onboarded) openOnboarding(); }, 600);
+  }
+}
+
 /* ================= cloud sync + auth (Supabase) =================
    Optional layer on top of the local-first model. Everything still
    works offline in localStorage; when signed in, save() also pushes
@@ -2368,6 +3956,8 @@ function flattenTaskTree(goal) {
 }
 
 function cloudGoalRows() {
+  /* NOTE: the goals table has no kind column — goal kind rides in the
+     profile ui.v6 blob (goalKinds) instead of breaking this upsert. */
   return state.goals.map((g) => ({
     id: g.id, user_id: cloudUser.id, title: g.title,
     timeline: g.timeline || null, deadline: g.deadline || null,
@@ -2408,7 +3998,23 @@ function cloudProfileRow() {
     voice: { celebrations: !(state.voice && state.voice.celebrations === false) },
     notify: { deadlines: !!(state.notify && state.notify.deadlines) },
     focus_sessions: +state.focusSessions || 0,
-    ui: { skipGoalDeleteConfirm: !!(state.ui && state.ui.skipGoalDeleteConfirm) },
+    /* v6 collections ride inside the profile row's ui JSON column,
+       so no schema change is needed for protocols/vision/reports. */
+    ui: {
+      skipGoalDeleteConfirm: !!(state.ui && state.ui.skipGoalDeleteConfirm),
+      v6: {
+        settings: state.settings || { autoResetRoutines: true, texture: "none" },
+        onboarded: !!state.onboarded,
+        categories: state.categories || null,
+        protocols: state.protocols || [],
+        vision: state.vision || [],
+        reports: state.reports || [],
+        goalKinds: Object.fromEntries((state.goals || []).filter((g) => g.kind === "project").map((g) => [g.id, "project"])),
+        noteColors: Object.fromEntries((state.notes || []).filter((n) => n.color).map((n) => [n.id, n.color])),
+        taskMeta: collectTaskMeta(),
+        purpose: state.purpose || "",
+      },
+    },
     updated_at: new Date().toISOString(),
   };
 }
@@ -2428,6 +4034,48 @@ function applyCloudProfile(row) {
   state.notify = { deadlines: !!(row.notify && row.notify.deadlines) };
   state.focusSessions = +row.focus_sessions || 0;
   state.ui = { skipGoalDeleteConfirm: !!(row.ui && row.ui.skipGoalDeleteConfirm) };
+  /* v6: restore collections stashed in the ui JSON column, if present */
+  const v6 = row.ui && row.ui.v6;
+  if (v6 && typeof v6 === "object") {
+    if (v6.settings) {
+      state.settings = {
+        autoResetRoutines: v6.settings.autoResetRoutines !== false,
+        texture: ["dots", "grid", "diagonal"].includes(v6.settings.texture) ? v6.settings.texture : "none",
+      };
+    }
+    state.onboarded = !!v6.onboarded;
+    state.categories = v6.categories && typeof v6.categories === "object" ? v6.categories : null;
+    state.protocols = (v6.protocols || []).map(normalizeProtocol);
+    state.vision = (v6.vision || []).map((v) => ({
+      id: v.id || uid(), url: String(v.url || "").slice(0, 1000), caption: String(v.caption || "").slice(0, 120),
+    })).filter((v) => v.url);
+    state.reports = (v6.reports || []).map((r) => ({
+      id: r.id || uid(), date: String(r.date || ""), text: String(r.text || ""),
+    })).slice(0, 24);
+    /* patch the per-item extras the fixed tables can't hold */
+    if (v6.goalKinds) {
+      state.goals.forEach((g) => { if (v6.goalKinds[g.id] === "project") g.kind = "project"; });
+    }
+    if (v6.noteColors) {
+      state.notes.forEach((n) => {
+        if (v6.noteColors[n.id] && GOAL_COLORS[v6.noteColors[n.id]]) n.color = v6.noteColors[n.id];
+      });
+    }
+    if (v6.taskMeta) {
+      const walkMeta = (list) => (list || []).forEach((t) => {
+        const m = v6.taskMeta[t.id];
+        if (m) {
+          t.tags = Array.isArray(m.tags) ? m.tags : [];
+          t.pinned = !!m.pinned;
+        }
+        walkMeta(t.subtasks);
+      });
+      state.goals.forEach((g) => walkMeta(g.tasks));
+    }
+    if (v6.purpose) state.purpose = String(v6.purpose).slice(0, 200);
+    applyCategoryNames();
+    applyTexture();
+  }
 }
 
 function nestTasks(goalId, taskRows) {
@@ -2437,6 +4085,7 @@ function nestTasks(goalId, taskRows) {
     if (r.goal_id !== goalId) return;
     byId[r.id] = {
       id: r.id, text: r.text || "", done: !!r.done, deadline: r.deadline || null,
+      tags: Array.isArray(r.tags) ? r.tags : [], pinned: !!r.pinned,
       subtasks: [], _parent: r.parent_id, _pos: r.position || 0,
     };
   });
@@ -2595,10 +4244,14 @@ function applyCloudState(data) {
     id: g.id, icon: "target", title: g.title || "Untitled goal", timeline: g.timeline || "",
     deadline: g.deadline || null, category: catOf(g.category).id,
     color: g.color && GOAL_COLORS[g.color] ? g.color : null,
+    kind: "goal", /* patched from the profile v6 blob in applyCloudProfile */
     tasks: nestTasks(g.id, data.tasks || []),
   }));
   state.wishlist = (data.wishlist || []).map((x) => ({ id: x.id, text: x.text || "", done: !!x.done }));
-  state.notes = (data.notes || []).map((x) => ({ id: x.id, title: x.title || "", body: x.body || "" }));
+  state.notes = (data.notes || []).map((x) => ({
+    id: x.id, title: x.title || "", body: x.body || "",
+    color: null, /* patched from the profile v6 blob in applyCloudProfile */
+  }));
   state.routines = (data.routines || []).map((r) =>
     normalizeRoutine({ id: r.id, text: r.text, days: r.days, done: r.done }));
   const profile = (data.user_profile || [])[0] || null;
