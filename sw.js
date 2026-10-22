@@ -1,6 +1,6 @@
 /* Task Breaker service worker: offline app shell.
    Supabase API calls are never cached. */
-const CACHE = "taskbreaker-v1";
+const CACHE = "taskbreaker-v6";
 const SHELL = [
   "./",
   "index.html",
