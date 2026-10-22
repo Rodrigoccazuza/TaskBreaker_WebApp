@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Task Breaker — Progress Tracker</title>
+<meta name="description" content="Task Breaker: break big goals into small tasks, earn XP and medals." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;500;700;800&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css" />
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#101010" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Task Breaker" />
+<link rel="icon" type="image/png" href="icons/icon-192.png" />
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+</head>
+<body data-theme="light">
+
+<!-- ============ AUTH ============ -->
+<div class="auth-screen" id="authScreen">
+  <div class="auth-bg" aria-hidden="true"><div class="auth-grain"></div></div>
+  <div class="auth-wrap">
+    <div class="auth-brand">
+      <span class="auth-mark" aria-hidden="true"><i class="bi bi-lightning-charge"></i></span>
+      <h1>Task Breaker</h1>
+    </div>
+    <div class="auth-card">
+      <div class="auth-tabs" role="tablist" aria-label="Sign in or create account">
+        <button type="button" class="auth-tab active" data-mode="signin" role="tab" aria-selected="true">Sign in</button>
+        <button type="button" class="auth-tab" data-mode="signup" role="tab" aria-selected="false">Create account</button>
+      </div>
+      <form class="auth-form" id="authForm" novalidate>
+        <label class="auth-field">
+          <span>Email</span>
+          <input type="email" id="authEmail" class="auth-input" placeholder="you@example.com" autocomplete="email" />
+          <small class="auth-hint" id="authEmailHint"></small>
+        </label>
+        <label class="auth-field">
+          <span>Password</span>
+          <input type="password" id="authPassword" class="auth-input" placeholder="Enter your password" autocomplete="current-password" />
+          <small class="auth-hint" id="authPasswordHint"></small>
+        </label>
+        <div class="pw-strength" id="pwStrength" hidden>
+          <div class="pw-track"><div class="pw-bar" id="pwBar"></div></div>
+          <span class="pw-label" id="pwLabel"></span>
+        </div>
+        <div class="auth-remember-row">
+          <label class="auth-remember">
+            <input type="checkbox" id="authRemember" checked />
+            <span class="remember-box" aria-hidden="true"></span>
+            <span class="remember-label">Remember me</span>
+          </label>
+          <button type="button" class="linklike" id="forgotBtn">Forgot password?</button>
+        </div>
+        <p class="auth-form-error" id="authFormError" role="alert" hidden></p>
+        <button type="submit" class="auth-submit" id="authSubmit">Sign in</button>
+      </form>
+      <div class="auth-confirm" id="authConfirm" hidden>
+        <span class="auth-confirm-icon" aria-hidden="true"><i class="bi bi-envelope-check"></i></span>
+        <h2>Check your inbox</h2>
+        <p>We sent a confirmation link to <strong id="authConfirmEmail"></strong>. Click it, then come back and sign in.</p>
+        <p class="auth-resend">Didn't get it? <button type="button" class="linklike" id="authResendBtn">Resend email</button></p>
+        <p class="auth-resend-msg" id="authResendMsg" role="status" hidden></p>
+        <button type="button" class="btn btn-secondary" id="authBackBtn">Back to sign in</button>
+      </div>
+      <div class="auth-reset" id="authReset" hidden>
+        <h2>Reset password</h2>
+        <p>Enter the email for your account and we will send you a reset link.</p>
+        <label class="auth-field">
+          <span>Email</span>
+          <input type="email" id="resetEmail" class="auth-input" placeholder="you@example.com" autocomplete="email" />
+        </label>
+        <p class="auth-reset-msg" id="resetMsg" role="status" hidden></p>
+        <button type="button" class="auth-submit" id="resetSend">Send reset link</button>
+        <button type="button" class="linklike" id="resetBack">Back to sign in</button>
+      </div>
+      <div class="auth-reset" id="authNewPw" hidden>
+        <h2>Choose a new password</h2>
+        <p>Enter a new password for your account.</p>
+        <label class="auth-field">
+          <span>New password</span>
+          <input type="password" id="newPassword" class="auth-input" placeholder="At least 8 characters" autocomplete="new-password" />
+        </label>
+        <p class="auth-reset-msg" id="newPwMsg" role="status" hidden></p>
+        <button type="button" class="auth-submit" id="newPasswordSave">Save new password</button>
+      </div>
+    </div>
+    <button type="button" class="auth-offline" id="offlineBtn">Continue without an account (offline)</button>
+  </div>
+</div>
+
+<div class="app" hidden>
+
+  <!-- ============ SIDEBAR ============ -->
+  <aside class="sidebar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true"><i class="bi bi-lightning-charge"></i></span>
+      <div>
+        <h1>Task Breaker</h1>
+        <p class="tagline">Progress Tracker</p>
+      </div>
+    </div>
+
+    <nav class="nav" aria-label="Sections">
+      <button type="button" class="nav-btn active" data-page="dashboard"><span class="nav-icon"><i class="bi bi-bar-chart-line"></i></span>Dashboard</button>
+      <button type="button" class="nav-btn" data-page="weekly"><span class="nav-icon"><i class="bi bi-calendar"></i></span>Weekly</button>
+      <button type="button" class="nav-btn" data-page="calendar"><span class="nav-icon"><i class="bi bi-calendar3"></i></span>Calendar</button>
+      <button type="button" class="nav-btn" data-page="rewards"><span class="nav-icon"><i class="bi bi-award"></i></span>Rewards</button>
+      <button type="button" class="nav-btn" data-page="wishlist"><span class="nav-icon"><i class="bi bi-star"></i></span>Wishlist</button>
+      <button type="button" class="nav-btn" data-page="notes"><span class="nav-icon"><i class="bi bi-file-text"></i></span>Notes</button>
+      <button type="button" class="nav-btn" data-page="protocols"><span class="nav-icon"><i class="bi bi-diagram-3"></i></span>Protocols</button>
+      <button type="button" class="nav-btn" data-page="vision"><span class="nav-icon"><i class="bi bi-images"></i></span>Vision</button>
+      <button type="button" class="nav-btn" data-page="digest"><span class="nav-icon"><i class="bi bi-envelope"></i></span>Digest</button>
+      <button type="button" class="nav-btn" data-page="connections"><span class="nav-icon"><i class="bi bi-link-45deg"></i></span>Connections</button>
+      <button type="button" class="nav-btn" data-page="pathfinder"><span class="nav-icon"><i class="bi bi-compass"></i></span>Pathfinder</button>
+      <button type="button" class="nav-btn" data-page="profile"><span class="nav-icon"><i class="bi bi-person"></i></span>Profile</button>
+    </nav>
+
+    <div class="sidebar-bottom">
+      <div class="user-chip" id="userChip">
+        <span class="sync-dot offline" id="syncDot" title="Offline"></span>
+        <span class="user-email" id="userEmail">Local only</span>
+        <button type="button" class="icon-btn" id="logoutBtn" title="Log out" aria-label="Log out" hidden><i class="bi bi-box-arrow-right"></i></button>
+      </div>
+      <div class="undo-row">
+        <button type="button" class="icon-btn" id="undoBtn" title="Undo (Cmd/Ctrl+Z)" aria-label="Undo"><i class="bi bi-arrow-counterclockwise"></i></button>
+        <button type="button" class="icon-btn" id="redoBtn" title="Redo (Cmd/Ctrl+Shift+Z)" aria-label="Redo"><i class="bi bi-arrow-clockwise"></i></button>
+      </div>
+      <div class="sidebar-focus" id="sidebarFocus" hidden>
+        <span class="focus-pulse" aria-hidden="true"><i class="bi bi-lock"></i></span>
+        <div class="sidebar-focus-info">
+          <strong id="sidebarFocusName">Focus</strong>
+          <span class="sidebar-focus-time" id="sidebarFocusTime">25:00</span>
+        </div>
+      </div>
+      <label class="theme-toggle" title="Toggle light / dark mode">
+        <input type="checkbox" id="themeToggle" />
+        <span class="switch"><span class="knob"><i class="bi bi-sun"></i></span></span>
+        <span class="theme-label" id="themeLabel">Light mode</span>
+      </label>
+      <p class="today" id="todayLabel"></p>
+      <p class="app-version">Task Breaker v6</p>
+    </div>
+  </aside>
+
+  <!-- ============ MAIN ============ -->
+  <main class="main">
+
+    <!-- DASHBOARD -->
+    <section class="page active" id="page-dashboard">
+      <header class="page-head">
+        <div>
+          <h2>Dashboard</h2>
+          <p class="page-sub">Break it down. Build it up.</p>
+        </div>
+      </header>
+
+      <div id="alertsStrip"></div>
+      <div class="wheels" id="wheelsRow" aria-label="Progress by category"></div>
+      <p class="wheels-hint" id="wheelsHint">Tap a wheel to focus on one category.</p>
+      <div id="priorityWrap"></div>
+      <div id="goalsByCategory"></div>
+
+      <article class="card add-goal-card">
+        <h3><i class="bi bi-plus"></i> New goal</h3>
+        <div class="add-goal-form">
+          <input type="text" id="newGoalTitle" placeholder="Goal name…" maxlength="80" autocomplete="off" />
+          <select id="newGoalCategory" aria-label="Category">
+            <option value="career">Career</option>
+            <option value="health">Health</option>
+            <option value="personal">Personal</option>
+            <option value="private">Private</option>
+          </select>
+          <select id="newGoalType" aria-label="Type">
+            <option value="goal">Goal</option>
+            <option value="project">Project</option>
+          </select>
+          <input type="text" id="newGoalTimeline" placeholder="Timeline (e.g. 2 months)" maxlength="30" autocomplete="off" />
+          <input type="date" id="newGoalDeadline" aria-label="Deadline (optional)" title="Deadline (optional)" />
+          <button type="button" class="btn btn-primary" id="addGoalBtn">Add goal</button>
+        </div>
+      </article>
+    </section>
+
+    <!-- WEEKLY -->
+    <section class="page" id="page-weekly">
+      <header class="page-head">
+        <div>
+          <h2>Weekly Routines</h2>
+          <p class="page-sub">Recurring tasks that reset every Monday. Tap a day to check it off.</p>
+        </div>
+      </header>
+      <div id="routineList"></div>
+      <article class="card">
+        <h3><i class="bi bi-plus"></i> New routine</h3>
+        <div class="routine-form">
+          <input type="text" id="routineInput" placeholder="e.g. Morning run…" maxlength="80" autocomplete="off" />
+          <div class="day-picker" id="routineDays" aria-label="Days"></div>
+          <button type="button" class="btn btn-primary" id="addRoutineBtn">Add</button>
+        </div>
+      </article>
+    </section>
+
+    <!-- REWARDS -->
+    <section class="page" id="page-rewards">
+      <header class="page-head">
+        <div>
+          <h2>Rewards</h2>
+          <p class="page-sub">Points, streaks and medals. Keep the chain going.</p>
+        </div>
+      </header>
+      <article class="card level-card">
+        <div class="level-top">
+          <span class="level-badge" id="levelBadge">1</span>
+          <div class="level-info">
+            <h3 id="levelTitle">Level 1</h3>
+            <div class="xp-bar"><div class="xp-fill" id="xpFill"></div></div>
+            <p class="xp-text" id="xpText"></p>
+          </div>
+          <div class="streak-pill" id="streakPill"><i class="bi bi-lightning-charge"></i> 0</div>
+        </div>
+      </article>
+      <h3 class="section-title">Medals</h3>
+      <div class="medals-grid" id="medalsGrid"></div>
+    </section>
+
+    <!-- WISHLIST -->
+    <section class="page" id="page-wishlist">
+      <header class="page-head">
+        <div>
+          <h2>Wishlist</h2>
+          <p class="page-sub">Things you want. Check them off when they're yours.</p>
+        </div>
+      </header>
+      <article class="card">
+        <form class="add-row" id="wishlistForm">
+          <input type="text" id="wishlistInput" placeholder="Add something to your wishlist…" maxlength="120" autocomplete="off" />
+          <button type="submit" class="btn btn-primary">Add</button>
+        </form>
+        <ul class="check-list" id="wishlistList"></ul>
+      </article>
+    </section>
+
+    <!-- NOTES -->
+    <section class="page" id="page-notes">
+      <header class="page-head">
+        <div>
+          <h2>Notes</h2>
+          <p class="page-sub">Ideas, reminders, anything worth keeping.</p>
+        </div>
+      </header>
+      <article class="card">
+        <div class="note-form">
+          <input type="text" id="noteTitle" placeholder="Note title…" maxlength="80" autocomplete="off" />
+          <div class="voice-row">
+            <textarea id="noteBody" rows="3" placeholder="Write your note…" maxlength="1000"></textarea>
+            <button type="button" class="mic-btn" id="noteMic" title="Dictate note"><i class="bi bi-mic"></i></button>
+          </div>
+          <div class="note-color-row">
+            <span class="note-color-label">Color</span>
+            <div class="color-pick" id="noteColorPick"></div>
+          </div>
+          <button type="button" class="btn btn-primary" id="addNoteBtn">Pin note</button>
+        </div>
+      </article>
+      <div class="note-filter" id="noteColorFilter" aria-label="Filter notes by color"></div>
+      <div class="notes-grid" id="notesGrid"></div>
+      <article class="card">
+        <h3><i class="bi bi-box-arrow-in-down"></i> Import a note</h3>
+        <p class="fine-print" style="margin-top:0">Someone sent you a note? Paste its text here and it becomes a note of your own.</p>
+        <div class="note-form">
+          <textarea id="noteImportText" rows="3" placeholder="Paste note text…" maxlength="2000"></textarea>
+          <button type="button" class="btn btn-secondary" id="noteImportBtn">Import as note</button>
+        </div>
+      </article>
+    </section>
+
+    <!-- DIGEST -->
+    <section class="page" id="page-digest">
+      <header class="page-head">
+        <div>
+          <h2>Weekly Digest</h2>
+          <p class="page-sub">A summary of your week, ready to email to yourself.</p>
+        </div>
+      </header>
+      <article class="card">
+        <h3>Digest settings</h3>
+        <div class="digest-form">
+          <label>Email<input type="text" id="digestEmail" placeholder="you@example.com" maxlength="120" autocomplete="off" /></label>
+          <div class="digest-row">
+            <label>Day
+              <select id="digestDay">
+                <option value="1">Monday</option>
+                <option value="2">Tuesday</option>
+                <option value="3">Wednesday</option>
+                <option value="4">Thursday</option>
+                <option value="5">Friday</option>
+                <option value="6">Saturday</option>
+                <option value="0">Sunday</option>
+              </select>
+            </label>
+            <label>Time<input type="time" id="digestTime" value="08:00" /></label>
+          </div>
+          <div class="check-row">
+            <label><input type="checkbox" id="digestGoals" checked /> Goal progress</label>
+            <label><input type="checkbox" id="digestRoutines" checked /> Weekly routines</label>
+            <label><input type="checkbox" id="digestWishlist" checked /> Wishlist</label>
+          </div>
+          <button type="button" class="btn btn-primary" id="saveDigestBtn">Save settings</button>
+        </div>
+      </article>
+      <article class="card">
+        <h3>Send it now</h3>
+        <p class="digest-note">This opens a pre-written email with your current digest. One tap to send.</p>
+        <div class="digest-preview" id="digestPreview"></div>
+        <button type="button" class="btn btn-primary" id="sendDigestBtn"><i class="bi bi-envelope"></i> Email my digest</button>
+        <p class="fine-print">Fully automatic sending (no taps needed) requires a small server component, which this static app doesn't have yet. The settings above are saved and ready for it.</p>
+      </article>
+      <article class="card">
+        <h3><i class="bi bi-journal-text"></i> Reports</h3>
+        <p class="digest-note">Save this week's digest as a dated report you can re-read any time, right here in the app.</p>
+        <button type="button" class="btn btn-secondary" id="saveReportBtn"><i class="bi bi-bookmark-plus"></i> Save current digest as a report</button>
+        <div id="reportList" style="margin-top:14px"></div>
+      </article>
+    </section>
+
+    <!-- CONNECTIONS -->
+    <section class="page" id="page-connections">
+      <header class="page-head">
+        <div>
+          <h2>Connections</h2>
+          <p class="page-sub">Bring in tasks and notes from your other tools.</p>
+        </div>
+      </header>
+      <article class="card">
+        <h3><i class="bi bi-link-45deg"></i> How importing works</h3>
+        <p class="fine-print" style="margin-bottom:0">Task Breaker runs entirely in your browser with no server, so it can't do live two-way sync with Notion or Google (those need secure logins a static page can't hold). Instead, import your data any of these ways — it stays on your device, and Pathfinder can then organize it into your categories.</p>
+      </article>
+      <article class="card">
+        <h3><i class="bi bi-file-earmark"></i> Upload a file</h3>
+        <p class="fine-print">CSV or JSON. From Google Sheets: File → Download → CSV. From Notion: ••• → Export → CSV.</p>
+        <div class="add-row">
+          <button type="button" class="btn btn-secondary" id="importFileBtn">Choose file…</button>
+          <input type="file" id="importFile" accept=".csv,.json,.txt" hidden />
+        </div>
+      </article>
+      <article class="card">
+        <h3><i class="bi bi-clipboard"></i> Paste text</h3>
+        <p class="fine-print">One item per line. Add a date like <code>2026-10-15</code> or <code>due: Oct 15</code> anywhere in the line.</p>
+        <div class="note-form">
+          <textarea id="pasteImport" rows="4" placeholder="Buy birthday gift&#10;Finish portfolio case study due: 2026-10-20&#10;Call dentist" maxlength="5000"></textarea>
+          <button type="button" class="btn btn-primary" id="pasteImportBtn">Import pasted text</button>
+        </div>
+      </article>
+      <article class="card">
+        <h3><i class="bi bi-database"></i> Published Google Sheet</h3>
+        <p class="fine-print">In Google Sheets: File → Share → Publish to web (CSV), then paste the link here. Or paste any public CSV link.</p>
+        <div class="add-row">
+          <input type="url" id="sheetUrl" placeholder="https://docs.google.com/spreadsheets/… or .csv link" autocomplete="off" />
+          <button type="button" class="btn btn-primary" id="sheetImportBtn">Fetch</button>
+        </div>
+      </article>
+      <article class="card">
+        <h3><i class="bi bi-inbox"></i> Imported items <span class="count-pill" id="importCount">0</span></h3>
+        <ul class="check-list" id="importList"></ul>
+      </article>
+    </section>
+
+    <!-- PATHFINDER -->
+    <section class="page" id="page-pathfinder">
+      <header class="page-head">
+        <div>
+          <h2>Pathfinder</h2>
+          <p class="page-sub">Your on-device interpreter. It reads your tasks and imports, sorts them into categories, and charts a personalized quest path.</p>
+        </div>
+      </header>
+      <article class="card path-hero">
+        <div>
+          <h3><i class="bi bi-compass"></i> Chart my path</h3>
+          <p class="fine-print" style="margin-bottom:0">Analyzes open tasks and imported items, assigns each a category, and builds today's quest path — ordered by urgency and impact. Runs locally; nothing leaves your device.</p>
+        </div>
+        <button type="button" class="btn btn-primary" id="analyzeBtn">Analyze</button>
+      </article>
+      <div id="pathResults" hidden>
+        <h3 class="section-title"><i class="bi bi-map"></i> Today's quest path</h3>
+        <ol class="path-list" id="pathList"></ol>
+        <h3 class="section-title"><i class="bi bi-lightning-charge"></i> Suggestions</h3>
+        <p class="fine-print">Imported items, pre-sorted. One tap sends a quest into the matching category inbox.</p>
+        <div id="suggestList"></div>
+      </div>
+    </section>
+
+    <!-- CALENDAR -->
+    <section class="page" id="page-calendar">
+      <header class="page-head">
+        <div>
+          <h2>Calendar</h2>
+          <p class="page-sub">Everything with a deadline, on one month grid.</p>
+        </div>
+      </header>
+      <article class="card">
+        <div class="cal-head">
+          <button type="button" class="icon-btn tool" id="calPrev" aria-label="Previous month"><i class="bi bi-chevron-left"></i></button>
+          <h3 id="calTitle">Month</h3>
+          <button type="button" class="icon-btn tool" id="calNext" aria-label="Next month"><i class="bi bi-chevron-right"></i></button>
+          <button type="button" class="btn btn-tertiary btn-sm" id="calToday">Today</button>
+        </div>
+        <div class="cal-week" aria-hidden="true">
+          <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
+        </div>
+        <div class="cal-grid" id="calGrid"></div>
+        <div class="cal-legend">
+          <span><i class="cal-dot due-over"></i> Overdue</span>
+          <span><i class="cal-dot due-soon"></i> Due soon</span>
+          <span><i class="cal-dot done"></i> Done</span>
+        </div>
+      </article>
+      <h3 class="section-title"><i class="bi bi-list-ul"></i> This month's deadlines</h3>
+      <div id="calList"></div>
+    </section>
+
+    <!-- PROTOCOLS -->
+    <section class="page" id="page-protocols">
+      <header class="page-head">
+        <div>
+          <h2>Protocols</h2>
+          <p class="page-sub">Reusable checklists. Save a goal's breakdown once, run it again any time.</p>
+        </div>
+      </header>
+      <article class="card">
+        <h3><i class="bi bi-plus"></i> New protocol</h3>
+        <div class="note-form">
+          <input type="text" id="protocolName" placeholder="Protocol name, e.g. Create a website…" maxlength="80" autocomplete="off" />
+          <textarea id="protocolItems" rows="5" placeholder="One checklist step per line…&#10;Define the goal&#10;Sketch the layout&#10;Build the first version" maxlength="3000"></textarea>
+          <button type="button" class="btn btn-primary" id="addProtocolBtn">Save protocol</button>
+        </div>
+        <p class="fine-print">Tip: any goal card also has a "Save as protocol" button. Protocols live on this device and in your cloud sync. Sharing protocols with a community arrives with accounts sync.</p>
+      </article>
+      <div id="protocolList"></div>
+    </section>
+
+    <!-- VISION -->
+    <section class="page" id="page-vision">
+      <header class="page-head">
+        <div>
+          <h2>Vision Board</h2>
+          <p class="page-sub">Pictures of where you're headed. Add image links and captions.</p>
+        </div>
+      </header>
+      <article class="card">
+        <h3><i class="bi bi-plus"></i> Add a card</h3>
+        <div class="note-form">
+          <input type="url" id="visionUrl" placeholder="Image URL (https://…)" autocomplete="off" />
+          <input type="text" id="visionCaption" placeholder="Caption, e.g. Our future house…" maxlength="120" autocomplete="off" />
+          <button type="button" class="btn btn-primary" id="addVisionBtn">Add to board</button>
+        </div>
+        <p class="fine-print" style="margin-bottom:0">Cards use image links from the web. Paste any image URL; the board arranges them in a grid.</p>
+      </article>
+      <div class="vision-grid" id="visionGrid"></div>
+    </section>
+
+    <!-- PROFILE -->
+    <section class="page" id="page-profile">
+      <header class="page-head">
+        <div>
+          <h2>Profile</h2>
+          <p class="page-sub">The person breaking all these tasks.</p>
+        </div>
+      </header>
+      <article class="card profile-card">
+        <div class="profile-top">
+          <span class="avatar" aria-hidden="true">R</span>
+          <div>
+            <h3>Rodrigo Cazuza</h3>
+            <p class="profile-role">Multimedia Designer &amp; Front-End Developer</p>
+            <p class="profile-loc"><i class="bi bi-geo-alt"></i> Astoria, Queens — New York City</p>
+          </div>
+        </div>
+        <dl class="profile-links">
+          <div><dt>Portfolio</dt><dd><a href="https://rodrigocazuza.com" target="_blank" rel="noopener">rodrigocazuza.com</a></dd></div>
+          <div><dt>Email</dt><dd><a href="mailto:visualdesigner@rodrigocazuza.com">visualdesigner@rodrigocazuza.com</a></dd></div>
+          <div><dt>GitHub</dt><dd><a href="https://github.com/Rodrigoccazuza" target="_blank" rel="noopener">github.com/Rodrigoccazuza</a></dd></div>
+        </dl>
+        <div class="profile-stats" id="profileStats"></div>
+      </article>
+      <article class="card">
+        <h3>Settings</h3>
+        <div class="settings-list">
+          <label class="setting-row">
+            <span><i class="bi bi-volume-up"></i> Spoken celebrations <small>Hear a cheer when you finish a goal</small></span>
+            <span class="mini-switch"><input type="checkbox" id="setVoice" /><span class="mini-knob"></span></span>
+          </label>
+          <label class="setting-row">
+            <span>⏰ Deadline alerts <small>Browser notification for urgent deadlines</small></span>
+            <span class="mini-switch"><input type="checkbox" id="setNotify" /><span class="mini-knob"></span></span>
+          </label>
+          <label class="setting-row">
+            <span><i class="bi bi-arrow-repeat"></i> Auto-reset routines <small>Uncheck weekly routines automatically when a new week starts</small></span>
+            <span class="mini-switch"><input type="checkbox" id="setAutoReset" checked /><span class="mini-knob"></span></span>
+          </label>
+        </div>
+      </article>
+      <article class="card">
+        <h3>Appearance</h3>
+        <div class="settings-list">
+          <label class="setting-row">
+            <span><i class="bi bi-grid-3x3-gap"></i> Background texture <small>A subtle pattern behind your lists</small></span>
+            <select id="setTexture" class="texture-select" aria-label="Background texture">
+              <option value="none">None</option>
+              <option value="dots">Dots</option>
+              <option value="grid">Grid</option>
+              <option value="diagonal">Diagonal</option>
+            </select>
+          </label>
+        </div>
+        <p class="fine-print">Light and dark mode live in the sidebar switch, as always.</p>
+      </article>
+      <article class="card">
+        <h3><i class="bi bi-lightning-charge"></i> About Task Breaker</h3>
+        <p class="about-lead">Task Breaker runs on four core principles:</p>
+        <ul class="core-list">
+          <li><strong>Reduce the learning curve</strong> — everything in one tap or two.</li>
+          <li><strong>Break down the task</strong> — no goal is too big once it's small pieces.</li>
+          <li><strong>Have a sense of direction and progress</strong> — wheels, streaks and XP always show where you stand.</li>
+          <li><strong>Have fun in the process</strong> — medals, celebrations and lock-in sessions keep it a game.</li>
+        </ul>
+        <button type="button" class="btn btn-secondary" id="rerunOnboardingBtn"><i class="bi bi-chat-dots"></i> Run the welcome setup again</button>
+      </article>
+      <article class="card">
+        <h3><i class="bi bi-shield-lock"></i> Privacy &amp; Data</h3>
+        <div class="privacy-text">
+          <p><strong>What Task Breaker keeps:</strong> your goals and tasks, notes, wishlist, routines, XP, medals and settings. That's it — the app only stores what you type into it.</p>
+          <p><strong>Where it lives:</strong> on this device, in your browser's local storage. When you sign in, a copy syncs to your own private cloud account (Supabase) so your other devices can pick it up. Nobody else can read it: every row is locked to your account.</p>
+          <p><strong>What it's for:</strong> running the app and improving your experience — your progress wheels, streaks, digests and suggestions. Pathfinder's suggestions are computed on your device; your tasks never leave it for analysis.</p>
+          <p><strong>What it never does:</strong> no ads, no trackers, no selling or sharing your data. Group goals and shared protocols will only ever use the same account sync, with your consent.</p>
+        </div>
+      </article>
+    </section>
+
+  </main>
+</div>
+
+<div class="toast" id="toast" role="status"></div>
+
+<!-- Task detail overlay -->
+<div class="overlay" id="taskOverlay">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="taskModalTitle">
+    <div class="modal-head">
+      <h3 id="taskModalTitle"></h3>
+      <button type="button" class="icon-btn" id="taskModalClose" aria-label="Close task details"><i class="bi bi-x"></i></button>
+    </div>
+    <div class="modal-meta" id="taskModalMeta"></div>
+    <div class="modal-progress" id="taskModalProgress"></div>
+    <ul class="detail-list" id="taskModalBody"></ul>
+    <form class="add-task modal-add" id="taskModalForm">
+      <input type="text" id="taskModalInput" placeholder="Add a subtask…" maxlength="120" autocomplete="off" />
+      <button type="submit" class="btn btn-primary btn-sm">Add</button>
+    </form>
+    <div class="modal-tags" id="taskModalTags"></div>
+    <div class="modal-actions-row">
+      <button type="button" class="btn btn-tertiary btn-sm" id="suggestBtn"><i class="bi bi-magic"></i> Suggest breakdown</button>
+      <button type="button" class="btn btn-tertiary btn-sm" id="pinBtn"><i class="bi bi-pin-angle"></i> Pin as priority</button>
+      <button type="button" class="btn btn-tertiary btn-sm" id="shareTaskBtn"><i class="bi bi-share"></i> Share task</button>
+    </div>
+    <div class="suggest-box" id="suggestBox" hidden></div>
+    <div class="move-box" id="moveBox">
+      <h4><i class="bi bi-arrows-move"></i> Move to</h4>
+      <div class="move-row">
+        <label>Goal
+          <select id="moveGoalSel" aria-label="Move to goal"></select>
+        </label>
+        <button type="button" class="btn btn-secondary btn-sm" id="moveGoalBtn">Move task</button>
+      </div>
+      <div class="move-row">
+        <label>Parent task
+          <select id="moveParentSel" aria-label="Move under parent task"></select>
+        </label>
+        <button type="button" class="btn btn-secondary btn-sm" id="moveParentBtn">Move</button>
+      </div>
+      <p class="fine-print" style="margin-top:6px">Moving keeps the task's subtasks with it. Pick "Top level (no parent)" to promote a subtask.</p>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm dialog -->
+<div class="overlay" id="confirmOverlay">
+  <div class="modal modal-sm" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle">
+    <h3 id="confirmTitle"></h3>
+    <p class="confirm-msg" id="confirmMsg"></p>
+    <label class="confirm-check" id="confirmCheckWrap">
+      <input type="checkbox" id="confirmCheck" />
+      <span id="confirmCheckLabel"></span>
+    </label>
+    <div class="confirm-actions">
+      <button type="button" class="btn btn-secondary" id="confirmNo">Cancel</button>
+      <button type="button" class="btn btn-danger" id="confirmYes">Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- Focus lock-in bar -->
+<div class="focus-bar" id="focusBar" hidden>
+  <span class="focus-pulse" aria-hidden="true"><i class="bi bi-lock"></i></span>
+  <div class="focus-info">
+    <strong id="focusTaskName">Task</strong>
+    <span class="focus-sub" id="focusGoalName"></span>
+  </div>
+  <span class="focus-time" id="focusTime">25:00</span>
+  <button type="button" class="focus-btn" id="focusOpenBtn" title="Open lock-in mode"><i class="bi bi-arrows-fullscreen"></i></button>
+  <button type="button" class="focus-btn" id="focusPauseBtn" title="Pause / resume"><i class="bi bi-pause"></i></button>
+  <button type="button" class="focus-btn" id="focusStopBtn" title="End focus session"><i class="bi bi-square"></i></button>
+</div>
+
+<!-- Focus lock-in overlay -->
+<div class="focus-overlay" id="focusOverlay" hidden>
+  <div class="focus-sheet">
+    <div class="conduct" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+    <p class="focus-kicker">Lock-in mode</p>
+    <h3 id="focusOverlayTask">Task</h3>
+    <p class="focus-overlay-goal" id="focusOverlayGoal"></p>
+    <div class="focus-overlay-time" id="focusOverlayTime">25:00</div>
+    <p class="focus-overlay-hint" id="focusOverlayHint">Check off this goal's tasks as you finish them. Finish them all and the session ends early, XP included.</p>
+    <ul class="focus-checklist" id="focusChecklist"></ul>
+    <div class="focus-overlay-actions">
+      <button type="button" class="btn btn-secondary" id="focusOverlayPause">Pause</button>
+      <button type="button" class="btn btn-primary" id="focusOverlayDone">End session</button>
+      <button type="button" class="btn btn-tertiary" id="focusOverlayClose">Minimize</button>
+    </div>
+  </div>
+</div>
+
+<!-- Quick-add FAB -->
+<div class="fab-wrap" id="fabWrap">
+  <div class="fab-menu" id="fabMenu" hidden>
+    <button type="button" class="fab-action" data-fab="goal"><i class="bi bi-bullseye"></i> New goal</button>
+    <button type="button" class="fab-action" data-fab="task"><i class="bi bi-check2-square"></i> Quick task</button>
+    <button type="button" class="fab-action" data-fab="note"><i class="bi bi-file-text"></i> New note</button>
+    <button type="button" class="fab-action" data-fab="wish"><i class="bi bi-star"></i> Wishlist item</button>
+    <button type="button" class="fab-action" data-fab="focus"><i class="bi bi-lock"></i> Start focus</button>
+  </div>
+  <button type="button" class="fab-main" id="fabMain" aria-label="Quick add" aria-expanded="false"><i class="bi bi-plus-lg"></i></button>
+</div>
+
+<!-- Mobile bottom bar -->
+<nav class="mobile-bar" id="mobileBar" aria-label="Quick sections">
+  <button type="button" class="mobile-bar-btn active" data-page="dashboard"><i class="bi bi-bar-chart-line"></i><span>Home</span></button>
+  <button type="button" class="mobile-bar-btn" data-page="calendar"><i class="bi bi-calendar3"></i><span>Calendar</span></button>
+  <button type="button" class="mobile-bar-btn" data-page="notes"><i class="bi bi-file-text"></i><span>Notes</span></button>
+  <button type="button" class="mobile-bar-btn" data-page="rewards"><i class="bi bi-award"></i><span>Rewards</span></button>
+  <button type="button" class="mobile-bar-btn" data-page="profile"><i class="bi bi-person"></i><span>Profile</span></button>
+</nav>
+
+<!-- Onboarding overlay -->
+<div class="overlay" id="onboardOverlay">
+  <div class="modal onboard-modal" role="dialog" aria-modal="true" aria-labelledby="onboardTitle">
+    <div class="onboard-dots" id="onboardDots" aria-hidden="true"></div>
+    <div id="onboardBody"></div>
+  </div>
+</div>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="supabase-config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
